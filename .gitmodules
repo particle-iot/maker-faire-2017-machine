@@ -1,0 +1,6 @@
+[submodule "Firmware Libraries/particle-simple-storage"]
+	path = Firmware Libraries/particle-simple-storage
+	url = git@github.com:monkbroc/particle-simple-storage.git
+[submodule "Firmware Libraries/particle-mf2017-can"]
+	path = Firmware Libraries/particle-mf2017-can
+	url = git@github.com:spark/particle-mf2017-can.git
