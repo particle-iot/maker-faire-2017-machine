@@ -4,3 +4,6 @@
 [submodule "Firmware Libraries/particle-mf2017-can"]
 	path = Firmware Libraries/particle-mf2017-can
 	url = git@github.com:spark/particle-mf2017-can.git
+[submodule "Lighting/lib/particle-mf2017-can"]
+	path = Lighting/lib/particle-mf2017-can
+	url = git@github.com:spark/particle-mf2017-can.git
