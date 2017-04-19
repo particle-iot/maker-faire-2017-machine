@@ -55,11 +55,11 @@ void startAttractMode() {
 
 void updateAttractMode() {
   if (attractCount >= PIXEL_COUNT) {
-    Serial.println("restarting");
+    //Serial.println("restarting");
     startAttractMode();
   }
 
-  Serial.printlnf("Update pos=%d count=%d", attractPos, attractCount);
+  //Serial.printlnf("Update pos=%d count=%d", attractPos, attractCount);
   attract[attractPos] = 1;
   if (attractPos != 0) {
     attract[attractPos - 1] = 0;
@@ -67,7 +67,7 @@ void updateAttractMode() {
   attractPos++;
 
   if (attractPos >= PIXEL_COUNT - attractCount) {
-    Serial.println("Starting next round");
+    //Serial.println("Starting next round");
     attractPos = 0;
     attractCount++;
   }
@@ -82,12 +82,20 @@ void updateBrightness() {
 }
 
 #define ATTRACT_COLOR 0xffffff
+const uint32_t attractColors[] = {
+  0xffffff,
+  0xff0000,
+  0x00ff00,
+  0x0000ff
+};
 void display() {
   switch (state) {
     case ATTRACT_MODE:
-      Serial.println("Displaying");
+      //Serial.println("Displaying");
+      int n = (comms.ballEntering[0] ? 2 : 0) + (comms.ballEntering[1] ?  1 : 0);
+      uint32_t c = attractColors[n];
       for (int i = 0; i < PIXEL_COUNT; i++) {
-        strip.setPixelColor(i, attract[i] ? ATTRACT_COLOR : 0);
+        strip.setPixelColor(i, attract[i] ? c : 0);
       }
       break;
   }
