@@ -9,3 +9,7 @@ For each panel, use app code with the panel number, i.e. `APP_CODE('M', 'F', 0, 
 ## Communication
 
 For sharing state between multiple modules through the CAN bus.
+
+## HSV
+
+Convert between red/green/blue colors and hue/saturation/value colors.
