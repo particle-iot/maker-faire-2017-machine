@@ -8,7 +8,8 @@
 
 SYSTEM_THREAD(ENABLED);
 
-Communication comms;
+BuiltinCAN can(CAN_D1_D2);
+Communication comms(can);
 
 // Neopixel strip
 #define PIXEL_PIN A1
@@ -92,7 +93,7 @@ void display() {
   switch (state) {
     case ATTRACT_MODE:
       //Serial.println("Displaying");
-      int n = (comms.ballEntering[0] ? 2 : 0) + (comms.ballEntering[1] ?  1 : 0);
+      int n = (comms.Input2Active ? 2 : 0) + (comms.Input1Active ?  1 : 0);
       uint32_t c = attractColors[n];
       for (int i = 0; i < PIXEL_COUNT; i++) {
         strip.setPixelColor(i, attract[i] ? c : 0);

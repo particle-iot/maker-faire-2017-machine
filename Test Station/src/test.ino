@@ -6,7 +6,8 @@
 
 SYSTEM_THREAD(ENABLED);
 
-Communication comms;
+BuiltinCAN can(CAN_D1_D2);
+Communication comms(can);
 
 // Switches
 #define SWITCH1_PIN B2
@@ -20,9 +21,9 @@ void setup() {
 }
 
 void loop() {
-  comms.ballEntering[0] = digitalRead(SWITCH1_PIN);
-  comms.ballEntering[1] = digitalRead(SWITCH2_PIN);
+  comms.Input1Active = digitalRead(SWITCH1_PIN);
+  comms.Input2Active = digitalRead(SWITCH2_PIN);
   comms.receive();
-  comms.transmit(MachineModules::Station1);
-  comms.transmit(MachineModules::Station2);
+  comms.transmit(MachineModules::Panel1);
+  comms.transmit(MachineModules::Panel2);
 }
