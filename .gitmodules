@@ -7,3 +7,6 @@
 [submodule "Lighting/lib/particle-mf2017-can"]
 	path = Lighting/lib/particle-mf2017-can
 	url = git@github.com:spark/particle-mf2017-can.git
+[submodule "Firmware Libraries/particle-hsv"]
+	path = Firmware Libraries/particle-hsv
+	url = git@github.com:monkbroc/particle-hsv.git
