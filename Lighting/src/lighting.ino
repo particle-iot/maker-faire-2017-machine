@@ -38,17 +38,19 @@ struct Config {
   uint8_t panelSize[PANEL_COUNT];
   uint8_t activeTimeout;
   uint8_t colorFillDelay;
+  uint8_t bulletBaseDelay;
 } config;
 
 Config defaultConfig = {
-  /* app */ APP_CODE('M', 'F', 'L', 2),
+  /* app */ APP_CODE('M', 'F', 'L', 3),
   /* fillingDelay */ 20,
   /* theaterChaseDelay */ 80,
   /* theaterChaseDuration */ 8,
   /* panelFirst */ { 0, 14, 28, 42 },
   /* panelCount */ { 14, 14, 14, 14 },
   /* activeTimeout */ 30,
-  /* colorFillDelay */ 10,
+  /* colorFillDelay */ 100,
+  /* bulletBaseDelay */ 100,
 };
 
 Storage<Config> storage(defaultConfig);
@@ -71,6 +73,7 @@ void loop() {
 
   // FIXME updatePanel1();
   updatePanel2();
+  updatePanel3();
 
   display();
 }
@@ -187,6 +190,7 @@ enum {
 };
 bool panelActive[PANEL_COUNT] = { 0 };
 long panelLastActive[PANEL_COUNT] = { 0 };
+long panelLastUpdate[PANEL_COUNT] = { 0 };
 uint32_t panelPixels[PIXEL_COUNT] = { 0 };
 
 void clearPanel(unsigned panel) {
@@ -239,34 +243,96 @@ void updatePanel2() {
     return;
   }
 
-  if (millis() - panel2LastUpdate < config.colorFillDelay) {
+  if (millis() - panelLastUpdate[PANEL2] < config.colorFillDelay) {
     return;
   }
-  panel2LastUpdate = millis();
+  panelLastUpdate[PANEL2] = millis();
 
   // FIXME: HACK!
-  unsigned x = analogRead(BRIGHTNESS_PIN) / 16 + 1;
-  if (x > 255) {
-    x = 255;
-  }
-  comms.InputColorHue = x;
+  //unsigned x = analogRead(BRIGHTNESS_PIN) / 16 + 1;
+  //if (x > 255) {
+  //  x = 255;
+  //}
+  //comms.InputColorHue = x;
+  // FIXME: end HACK!
 
   // Color flow
-  if (panelActive[PANEL2]) {
-    // shift every pixel one forward
-    unsigned first = config.panelFirst[PANEL2];
-    for (unsigned i = first + config.panelSize[PANEL2] - 1; i > first; i--) {
-      panelPixels[i] = panelPixels[i - 1];
-    }
 
-    // Compute RGB of input hue
-    RgbColor inputColor = HsvToRgb(HsvColor(comms.InputColorHue, 255, 255));
-    uint32_t c = strip.Color(inputColor.r, inputColor.g, inputColor.b);
-    panelPixels[first] = c;
+  // shift every pixel one forward
+  unsigned first = config.panelFirst[PANEL2];
+  for (unsigned i = first + config.panelSize[PANEL2] - 1; i > first; i--) {
+    panelPixels[i] = panelPixels[i - 1];
   }
+
+  // Compute RGB of input hue
+  RgbColor rgb = HsvToRgb(HsvColor(comms.InputColorHue, 255, 255));
+  uint32_t c = strip.Color(rgb.r, rgb.g, rgb.b);
+  panelPixels[first] = c;
 
   if (millis() - panelLastActive[PANEL2] > config.activeTimeout * 1000) {
     panelActive[PANEL2] = false;
+  }
+}
+
+/* Panel 3 interaction: rainbow bullet
+ */
+
+const auto bulletWidth = 2;
+const uint8_t bulletValue[bulletWidth + 1] = { 255, 128, 64 };
+uint8_t bulletHue = 0;
+unsigned bulletPos = bulletWidth;
+
+void updatePanel3() {
+  if (comms.Input3Active) {
+    // panel just became active
+    if (!panelActive[PANEL3]) {
+      panelActive[PANEL3] = true;
+    }
+    panelLastActive[PANEL3] = millis();
+  }
+
+  if (!panelActive[PANEL3]) {
+    return;
+  }
+
+  // FIXME: HACK!
+  //float x = analogRead(BRIGHTNESS_PIN) / 1024.0;
+  //comms.InputCrankSpeed = x;
+  // FIXME: end HACK!
+
+  long bulletDelay = config.bulletBaseDelay;
+  if (comms.InputCrankSpeed > 0.1) {
+    bulletDelay = (long) (bulletDelay / comms.InputCrankSpeed);
+  }
+  Serial.printlnf("crank=%f base=%d delay=%d", x, config.bulletBaseDelay, bulletDelay);
+
+  if (millis() - panelLastUpdate[PANEL3] < bulletDelay) {
+    return;
+  }
+  panelLastUpdate[PANEL3] = millis();
+
+  // Draw a bullet that moves across the panel faster the faster the
+  // user spins the crank. The bullet shifts colors as it moves
+  if (comms.InputCrankSpeed > 0) {
+    bulletHue++;
+    bulletPos++;
+  }
+  if (bulletPos >= config.panelSize[PANEL3] - bulletWidth) {
+    bulletPos = bulletWidth;
+  }
+
+  clearPanel(PANEL3);
+  unsigned first = config.panelFirst[PANEL3];
+  for (int i = -bulletWidth; i <= bulletWidth; i++) {
+    // The bullet is all one hue, but the value decreases at the extremities
+    uint8_t value = bulletValue[i < 0 ? -i : i];
+    RgbColor rgb = HsvToRgb(HsvColor(bulletHue, 255, value));
+    uint32_t c = strip.Color(rgb.r, rgb.g, rgb.b);
+    panelPixels[first + bulletPos + i] = c;
+  }
+
+  if (millis() - panelLastActive[PANEL3] > config.activeTimeout * 1000) {
+    panelActive[PANEL3] = false;
   }
 }
 
