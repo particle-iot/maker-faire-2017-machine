@@ -5,6 +5,9 @@
 
 #include "neopixel.h"
 #include "mf2017-can.h"
+#include "simple-storage.h"
+#include <algorithm>
+using namespace std;
 
 SYSTEM_THREAD(ENABLED);
 
@@ -22,8 +25,31 @@ Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 // Brightness
 #define BRIGHTNESS_PIN A0
 
+// Config stored in EEPROM
+#define PANEL_COUNT 4
+struct Config {
+  uint32_t app;
+  uint8_t fillingDelay;
+  uint8_t theaterChaseDelay;
+
+  uint8_t panelFirst[PANEL_COUNT];
+  uint8_t panelSize[PANEL_COUNT];
+} config;
+
+Config defaultConfig = {
+  /* app */ APP_CODE('M', 'F', 'L', 0),
+  /* fillingDelay */ 10,
+  /* theaterChaseDelay */ 250,
+  /* panelFirst */ { 0, 14, 28, 42 },
+  /* panelCount */ { 14, 14, 14, 14 },
+};
+
+Storage<Config> storage(defaultConfig);
+
 void setup() {
   Serial.begin();
+  storage.load(config);
+  delay(100);
   comms.begin();
   strip.begin();
   strip.show();
@@ -31,6 +57,7 @@ void setup() {
 }
 
 void loop() {
+  registerCloud();
   comms.receive();
   updateAttractMode();
   updateBrightness();
@@ -38,16 +65,35 @@ void loop() {
   delay(10);
 }
 
+void registerCloud() {
+  static bool registered = false;
+  if (!registered && Particle.connected()) {
+    registered = true;
+    Particle.function("set", updateConfig);
+  }
+}
+
+/* Attract mode will fill the lights at the bottom of inactive panels
+ * one dot at a time, then do a theater chase */
 enum {
-  ATTRACT_MODE
-} state = ATTRACT_MODE;
+  FILLING,
+  THEATER_CHASE
+} attractState = FILLING;
 
 uint8_t attract[PIXEL_COUNT];
 int attractPos;
 int attractCount;
 
+uint8_t attractSize() {
+  uint8_t s = 0;
+  for (unsigned i = 0; i < PANEL_COUNT; i++) {
+    s = max(config.panelSize[i], s);
+  }
+  return s;
+}
+
 void startAttractMode() {
-  for (int i = 0; i < PIXEL_COUNT; i++) {
+  for (unsigned i = 0, s = attractSize(); i < s; i++) {
     attract[i] = 0;
   }
   attractPos = 0;
@@ -55,20 +101,18 @@ void startAttractMode() {
 }
 
 void updateAttractMode() {
-  if (attractCount >= PIXEL_COUNT) {
-    //Serial.println("restarting");
+  unsigned s = attractSize();
+  if (attractCount >= s) {
     startAttractMode();
   }
 
-  //Serial.printlnf("Update pos=%d count=%d", attractPos, attractCount);
   attract[attractPos] = 1;
   if (attractPos != 0) {
     attract[attractPos - 1] = 0;
   }
   attractPos++;
 
-  if (attractPos >= PIXEL_COUNT - attractCount) {
-    //Serial.println("Starting next round");
+  if (attractPos >= s - attractCount) {
     attractPos = 0;
     attractCount++;
   }
@@ -89,17 +133,42 @@ const uint32_t attractColors[] = {
   0x00ff00,
   0x0000ff
 };
+
 void display() {
-  switch (state) {
-    case ATTRACT_MODE:
-      //Serial.println("Displaying");
-      int n = (comms.Input2Active ? 2 : 0) + (comms.Input1Active ?  1 : 0);
-      uint32_t c = attractColors[n];
-      for (int i = 0; i < PIXEL_COUNT; i++) {
-        strip.setPixelColor(i, attract[i] ? c : 0);
-      }
-      break;
+  for (unsigned panel = 0; panel < PANEL_COUNT; panel++) {
+    displayAttract(panel);
   }
   strip.show();
+}
+
+// Fill the lights of panel with the current attract mode pattern
+void displayAttract(unsigned panel) {
+  unsigned s = config.panelSize[panel];
+  for (unsigned i = 0, panelPos = config.panelFirst[panel], attractPos = attractSize() - s;
+      i < s;
+      i++, panelPos++, attractPos++) {
+    strip.setPixelColor(panelPos, attract[attractPos] ? ATTRACT_COLOR : 0);
+  }
+}
+
+// Call Particle cloud function "set" with name=value to update a config value
+int updateConfig(String arg) {
+    int equalPos = arg.indexOf('=');
+    if (equalPos < 0) {
+        return -1;
+    }
+    String name = arg.substring(0, equalPos);
+    String value = arg.substring(equalPos + 1);
+
+    if (name.equals("fillingDelay")) {
+        config.fillingDelay = value.toInt();
+    } else if (name.equals("theaterChaseDelay")) {
+        config.theaterChaseDelay = value.toInt();
+    } else {
+        return -2;
+    }
+
+    storage.store(config);
+    return 0;
 }
 
