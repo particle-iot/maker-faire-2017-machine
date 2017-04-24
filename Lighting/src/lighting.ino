@@ -39,10 +39,11 @@ struct Config {
   uint8_t activeTimeout;
   uint8_t colorFillDelay;
   uint8_t bulletBaseDelay;
+  uint8_t hueSliderDelay;
 } config;
 
 Config defaultConfig = {
-  /* app */ APP_CODE('M', 'F', 'L', 3),
+  /* app */ APP_CODE('M', 'F', 'L', 4),
   /* fillingDelay */ 20,
   /* theaterChaseDelay */ 80,
   /* theaterChaseDuration */ 8,
@@ -51,6 +52,7 @@ Config defaultConfig = {
   /* activeTimeout */ 30,
   /* colorFillDelay */ 100,
   /* bulletBaseDelay */ 100,
+  /* hueSliderDelay */ 20,
 };
 
 Storage<Config> storage(defaultConfig);
@@ -71,9 +73,10 @@ void loop() {
   updateAttractMode();
   updateBrightness();
 
-  // FIXME updatePanel1();
+  updatePanel1();
   updatePanel2();
   updatePanel3();
+  updatePanel4();
 
   display();
 }
@@ -212,22 +215,10 @@ unsigned panel1Count;
 uint32_t panel1Color;
 
 void updatePanel1() {
-  if (comms.Input1Active && !panelActive[PANEL1]) {
-    panelActive[PANEL1] = true;
-    if (comms.RedButtonPressed) {
-      panel1Color = RED_COLOR;
-    } else if (comms.GreenButtonPressed) {
-      panel1Color = GREEN_COLOR;
-    } else if (comms.BlueButtonPressed) {
-      panel1Color = BLUE_COLOR;
-    }
-  }
 }
 
 /* Panel 2 interaction: flow current color
  */
-
-long panel2LastUpdate = 0;
 
 void updatePanel2() {
   if (comms.Input2Active) {
@@ -249,11 +240,11 @@ void updatePanel2() {
   panelLastUpdate[PANEL2] = millis();
 
   // FIXME: HACK!
-  //unsigned x = analogRead(BRIGHTNESS_PIN) / 16 + 1;
-  //if (x > 255) {
-  //  x = 255;
-  //}
-  //comms.InputColorHue = x;
+  unsigned x = analogRead(BRIGHTNESS_PIN) / 16 + 1;
+  if (x > 255) {
+    x = 255;
+  }
+  comms.InputColorHue = x;
   // FIXME: end HACK!
 
   // Color flow
@@ -296,8 +287,8 @@ void updatePanel3() {
   }
 
   // FIXME: HACK!
-  //float x = analogRead(BRIGHTNESS_PIN) / 1024.0;
-  //comms.InputCrankSpeed = x;
+  float x = analogRead(BRIGHTNESS_PIN) / 1024.0;
+  comms.InputCrankSpeed = x;
   // FIXME: end HACK!
 
   long bulletDelay = config.bulletBaseDelay;
@@ -335,6 +326,92 @@ void updatePanel3() {
     panelActive[PANEL3] = false;
   }
 }
+
+/* Panel 4 interaction: hue slider
+ */
+
+uint8_t leftHue = 0;
+uint8_t rightHue = 0;
+
+void updatePanel4() {
+  // FIXME: HACK!
+  comms.Input4Active = Serial.available();
+  // FIXME: end HACK!
+
+  if (comms.Input4Active) {
+    // panel just became active
+    if (!panelActive[PANEL4]) {
+      panelActive[PANEL4] = true;
+    }
+    panelLastActive[PANEL4] = millis();
+  }
+
+  if (!panelActive[PANEL4]) {
+    return;
+  }
+
+  if (millis() - panelLastUpdate[PANEL4] < config.hueSliderDelay) {
+    return;
+  }
+  panelLastUpdate[PANEL4] = millis();
+
+  // FIXME: HACK!
+  comms.LeftJoystickUp = 0;
+  comms.LeftJoystickDown = 0;
+  comms.RightJoystickUp = 0;
+  comms.RightJoystickDown = 0;
+  if (Serial.available()) {
+    switch (Serial.read()) {
+      case 'q': comms.LeftJoystickUp = 1; break;
+      case 'a': comms.LeftJoystickDown = 1; break;
+      case 'w': comms.RightJoystickUp = 1; break;
+      case 's': comms.RightJoystickDown = 1; break;
+    }
+  }
+  // FIXME: end HACK!
+
+  // Change left and right hue depending on the joysticks.
+  // Linearly interpolate between the 2 hues
+  if (comms.LeftJoystickUp) {
+    leftHue++;
+  }
+  if (comms.LeftJoystickDown) {
+    leftHue--;
+  }
+  if (comms.RightJoystickUp) {
+    rightHue++;
+  }
+  if (comms.RightJoystickDown) {
+    rightHue--;
+  }
+
+  unsigned first = config.panelFirst[PANEL4];
+  unsigned size = config.panelSize[PANEL4];
+
+  // Find the increment to be able to linearly interpolate between the 2 hues.
+  // The basic formula is delta = (rightHue - leftHue) / (size - 1)
+  // Take special care of negative numbers because these calculations
+  // are done using integer arithmetic.
+  uint16_t deltaHue;
+  int8_t diff = rightHue - leftHue;
+  if (diff >= 0) {
+    deltaHue = (diff << 8) / (size - 1);
+  } else {
+    deltaHue = -((-diff << 8) / (size - 1));
+  }
+  uint16_t accumulatedHue = leftHue << 8;
+  for (unsigned i = first, n = first + size; i < n; i++) {
+    RgbColor rgb = HsvToRgb(HsvColor(accumulatedHue >> 8, 255, 255));
+    uint32_t c = strip.Color(rgb.r, rgb.g, rgb.b);
+    panelPixels[i] = c;
+    accumulatedHue += deltaHue;
+  }
+
+  if (millis() - panelLastActive[PANEL4] > config.activeTimeout * 1000) {
+    panelActive[PANEL4] = false;
+  }
+}
+
 
 void updateBrightness() {
   //unsigned brightness = analogRead(BRIGHTNESS_PIN) / 16 + 1;
@@ -399,10 +476,30 @@ int updateConfig(String arg) {
         config.theaterChaseDelay = value.toInt();
     } else if (name.equals("theaterChaseDuration")) {
         config.theaterChaseDuration = value.toInt();
+    } else if (name.equals("panel1First")) {
+        config.panelFirst[PANEL1] = value.toInt();
+    } else if (name.equals("panel2First")) {
+        config.panelFirst[PANEL2] = value.toInt();
+    } else if (name.equals("panel3First")) {
+        config.panelFirst[PANEL3] = value.toInt();
+    } else if (name.equals("panel4First")) {
+        config.panelFirst[PANEL4] = value.toInt();
+    } else if (name.equals("panel1Size")) {
+        config.panelSize[PANEL1] = value.toInt();
+    } else if (name.equals("panel2Size")) {
+        config.panelSize[PANEL2] = value.toInt();
+    } else if (name.equals("panel3Size")) {
+        config.panelSize[PANEL3] = value.toInt();
+    } else if (name.equals("panel4Size")) {
+        config.panelSize[PANEL4] = value.toInt();
     } else if (name.equals("activeTimeout")) {
         config.activeTimeout = value.toInt();
     } else if (name.equals("colorFillDelay")) {
         config.colorFillDelay = value.toInt();
+    } else if (name.equals("bulletBaseDelay")) {
+        config.bulletBaseDelay = value.toInt();
+    } else if (name.equals("hueSliderDelay")) {
+        config.hueSliderDelay = value.toInt();
     } else {
         return -2;
     }
