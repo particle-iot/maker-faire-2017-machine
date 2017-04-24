@@ -30,20 +30,19 @@ const auto BRIGHTNESS_PIN = A0;
 const auto PANEL_COUNT = 4;
 struct Config {
   uint32_t app;
-  uint8_t fillingDelay;
-  uint8_t theaterChaseDelay;
-  uint8_t theaterChaseDuration;
-
+  uint16_t fillingDelay;
+  uint16_t theaterChaseDelay;
+  uint16_t theaterChaseDuration;
   uint8_t panelFirst[PANEL_COUNT];
   uint8_t panelSize[PANEL_COUNT];
-  uint8_t activeTimeout;
-  uint8_t colorFillDelay;
-  uint8_t bulletBaseDelay;
-  uint8_t hueSliderDelay;
+  uint16_t activeTimeout;
+  uint16_t colorFillDelay;
+  uint16_t bulletBaseDelay;
+  uint16_t hueSliderDelay;
 } config;
 
 Config defaultConfig = {
-  /* app */ APP_CODE('M', 'F', 'L', 4),
+  /* app */ APP_CODE('M', 'F', 'L', 5),
   /* fillingDelay */ 20,
   /* theaterChaseDelay */ 80,
   /* theaterChaseDuration */ 8,
@@ -173,7 +172,7 @@ void updateAttractTheaterChase() {
   attractLastUpdate = millis();
 
   for (unsigned i = 0, s = attractSize(); i < s; i++) {
-    unsigned n = (i - attractCount) % 4;
+    unsigned n = (i - attractCount) % 5;
     attract[i] = (n < 2) ? 1 : 0;
   }
   attractCount++;
