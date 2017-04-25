@@ -10,6 +10,9 @@
 #include <algorithm>
 using namespace std;
 
+// Define when using the 56 LED test strip instead of the full strip
+//#define MINI_MODE
+
 SYSTEM_THREAD(ENABLED);
 
 BuiltinCAN can(CAN_D1_D2);
@@ -17,14 +20,15 @@ Communication comms(can);
 
 // Neopixel strip
 const auto PIXEL_PIN = A1;
+#ifdef MINI_MODE
 const auto PIXEL_COUNT = 56;
 const auto PIXEL_TYPE = WS2812B;
+#else
+const auto PIXEL_COUNT = 300;
+const auto PIXEL_TYPE = SK6812RGBW;
+#endif
 
 Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
-
-// FIXME: remove
-// Brightness
-const auto BRIGHTNESS_PIN = A0;
 
 // Config stored in EEPROM
 const auto PANEL_COUNT = 4;
@@ -42,6 +46,7 @@ struct Config {
   uint16_t hueSliderDelay;
 } config;
 
+#ifdef MINI_MODE
 Config defaultConfig = {
   /* app */ APP_CODE('M', 'F', 'L', 6),
   /* fillingDelay */ 20,
@@ -55,13 +60,27 @@ Config defaultConfig = {
   /* bulletBaseDelay */ 100,
   /* hueSliderDelay */ 20,
 };
+#else
+Config defaultConfig = {
+  /* app */ APP_CODE('M', 'F', 'L', 6),
+  /* fillingDelay */ 5,
+  /* theaterChaseDelay */ 40,
+  /* theaterChaseDuration */ 8,
+  /* panelFirst */ { 0, 75, 150, 225 },
+  /* panelCount */ { 75, 75, 75, 75 },
+  /* activeTimeout */ 30,
+  /* colorFillDelay */ 20,
+  /* colorFlowDelay */ 30,
+  /* bulletBaseDelay */ 100,
+  /* hueSliderDelay */ 20,
+};
+#endif
 
 Storage<Config> storage(defaultConfig);
 
 void setup() {
   Serial.begin();
   storage.load(config);
-  delay(100);
   comms.begin();
   strip.begin();
   strip.show();
@@ -72,7 +91,8 @@ void loop() {
   registerCloud();
   comms.receive();
   updateAttractMode();
-  updateBrightness();
+  // TODO: handle brightness through CAN
+  //updateBrightness();
 
   updatePanel1();
   updatePanel2();
@@ -220,8 +240,10 @@ void shiftPanel(unsigned panel) {
 const auto RED_COLOR = 0xff0000;
 const auto GREEN_COLOR = 0x00ff00;
 const auto BLUE_COLOR = 0x0000ff;
+const auto PANEL1_MAX_BRIGHTNESS = 255;
 
 uint32_t panel1Color;
+uint8_t panel1Brightness;
 bool panel1RedPressed;
 bool panel1GreenPressed;
 bool panel1BluePressed;
@@ -250,16 +272,19 @@ void updatePanel1() {
 
   if (comms.RedButtonPressed && !panel1RedPressed) {
     panel1Color = RED_COLOR;
+    panel1Brightness = PANEL1_MAX_BRIGHTNESS;
   }
   panel1RedPressed = comms.RedButtonPressed;
 
   if (comms.GreenButtonPressed && !panel1GreenPressed) {
     panel1Color = GREEN_COLOR;
+    panel1Brightness = PANEL1_MAX_BRIGHTNESS;
   }
   panel1GreenPressed = comms.GreenButtonPressed;
 
   if (comms.BlueButtonPressed && !panel1BluePressed) {
     panel1Color = BLUE_COLOR;
+    panel1Brightness = PANEL1_MAX_BRIGHTNESS;
   }
   panel1BluePressed = comms.BlueButtonPressed;
 
@@ -270,7 +295,13 @@ void updatePanel1() {
 
   // shift in active color
   unsigned first = config.panelFirst[PANEL1];
-  panelPixels[first] = panel1Color;
+  uint32_t c = ((panel1Color * panel1Brightness) >> 8) & panel1Color;
+  panelPixels[first] = c;
+
+  // Reduce brightness of color for next shift in
+  if (panel1Brightness > 1) {
+    panel1Brightness -= 2;
+  }
 
   if (millis() - panelLastActive[PANEL1] > config.activeTimeout * 1000) {
     panelActive[PANEL1] = false;
@@ -318,8 +349,13 @@ void updatePanel2() {
 /* Panel 3 interaction: rainbow bullet
  */
 
+#ifdef MINI_MODE
 const auto bulletWidth = 2;
 const uint8_t bulletValue[bulletWidth + 1] = { 255, 128, 64 };
+#else
+const auto bulletWidth = 4;
+const uint8_t bulletValue[bulletWidth + 1] = { 255, 255, 180, 128, 64 };
+#endif
 uint8_t bulletHue = 0;
 unsigned bulletPos = bulletWidth;
 
@@ -438,17 +474,11 @@ void updatePanel4() {
   }
 }
 
-
-void updateBrightness() {
-  //unsigned brightness = analogRead(BRIGHTNESS_PIN) / 16 + 1;
-  //if (brightness > 255) {
-  //  brightness = 255;
-  //}
-  unsigned brightness = 16;
-  strip.setBrightness(brightness);
-}
-
+#ifdef MINI_MODE
 const auto ATTRACT_COLOR = 0xffffff;
+#else
+const auto ATTRACT_COLOR = 0xff000000; // use white pixels
+#endif
 
 long displayLastUpdate = 0;
 const auto DISPLAY_INTERVAL = 10;
@@ -469,11 +499,24 @@ void display() {
   strip.show();
 }
 
+uint32_t normalizeColor(uint32_t c) {
+#ifdef MINI_MODE
+  return c;
+#else
+  // Swap red and green for RGBW pixel
+  uint8_t w = (c >> 24) & 0xff;
+  uint8_t r = (c >> 16) & 0xff;
+  uint8_t g = (c >> 8) & 0xff;
+  uint8_t b = c & 0xff;
+  return (w << 24) | (g << 16) | (r << 8) | b;
+#endif
+}
+
 // Fill the lights of panel with the current active mode pattern
 void displayActive(unsigned panel) {
   unsigned first = config.panelFirst[panel];
   for (unsigned i = first, n = first + config.panelSize[panel]; i < n; i++) {
-    strip.setPixelColor(i, panelPixels[i]);
+    strip.setPixelColor(i, normalizeColor(panelPixels[i]));
   }
 }
 
@@ -483,7 +526,7 @@ void displayAttract(unsigned panel) {
   for (unsigned i = 0, panelPos = config.panelFirst[panel], attractPos = attractSize() - s;
       i < s;
       i++, panelPos++, attractPos++) {
-    strip.setPixelColor(panelPos, attract[attractPos] ? ATTRACT_COLOR : 0);
+    strip.setPixelColor(panelPos, attract[attractPos] ? normalizeColor(ATTRACT_COLOR) : 0);
   }
 }
 
