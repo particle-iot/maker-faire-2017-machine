@@ -17,12 +17,12 @@ Communication comms(can);
 
 // Neopixel strip
 const auto PIXEL_PIN = A1;
-//#define PIXEL_COUNT 183
 const auto PIXEL_COUNT = 56;
 const auto PIXEL_TYPE = WS2812B;
 
 Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
+// FIXME: remove
 // Brightness
 const auto BRIGHTNESS_PIN = A0;
 
@@ -37,12 +37,13 @@ struct Config {
   uint8_t panelSize[PANEL_COUNT];
   uint16_t activeTimeout;
   uint16_t colorFillDelay;
+  uint16_t colorFlowDelay;
   uint16_t bulletBaseDelay;
   uint16_t hueSliderDelay;
 } config;
 
 Config defaultConfig = {
-  /* app */ APP_CODE('M', 'F', 'L', 5),
+  /* app */ APP_CODE('M', 'F', 'L', 6),
   /* fillingDelay */ 20,
   /* theaterChaseDelay */ 80,
   /* theaterChaseDuration */ 8,
@@ -50,6 +51,7 @@ Config defaultConfig = {
   /* panelCount */ { 14, 14, 14, 14 },
   /* activeTimeout */ 30,
   /* colorFillDelay */ 100,
+  /* colorFlowDelay */ 100,
   /* bulletBaseDelay */ 100,
   /* hueSliderDelay */ 20,
 };
@@ -195,10 +197,19 @@ long panelLastActive[PANEL_COUNT] = { 0 };
 long panelLastUpdate[PANEL_COUNT] = { 0 };
 uint32_t panelPixels[PIXEL_COUNT] = { 0 };
 
+// Set all pixels of a panel to off (black)
 void clearPanel(unsigned panel) {
   unsigned first = config.panelFirst[panel];
   for (unsigned i = first, n = first + config.panelSize[panel]; i < n; i++) {
     panelPixels[i] = 0;
+  }
+}
+
+// Shift all pixels of a panel forward
+void shiftPanel(unsigned panel) {
+  unsigned first = config.panelFirst[panel];
+  for (unsigned i = first + config.panelSize[panel] - 1; i > first; i--) {
+    panelPixels[i] = panelPixels[i - 1];
   }
 }
 
@@ -210,10 +221,60 @@ const auto RED_COLOR = 0xff0000;
 const auto GREEN_COLOR = 0x00ff00;
 const auto BLUE_COLOR = 0x0000ff;
 
-unsigned panel1Count;
 uint32_t panel1Color;
+bool panel1RedPressed;
+bool panel1GreenPressed;
+bool panel1BluePressed;
 
 void updatePanel1() {
+  if (comms.Input1Active) {
+    // panel just became active
+    if (!panelActive[PANEL1]) {
+      panelActive[PANEL1] = true;
+      clearPanel(PANEL1);
+      panel1RedPressed = false;
+      panel1GreenPressed = false;
+      panel1BluePressed = false;
+    }
+    panelLastActive[PANEL1] = millis();
+  }
+
+  if (!panelActive[PANEL1]) {
+    return;
+  }
+
+  if (millis() - panelLastUpdate[PANEL1] < config.colorFillDelay) {
+    return;
+  }
+  panelLastUpdate[PANEL1] = millis();
+
+  if (comms.RedButtonPressed && !panel1RedPressed) {
+    panel1Color = RED_COLOR;
+  }
+  panel1RedPressed = comms.RedButtonPressed;
+
+  if (comms.GreenButtonPressed && !panel1GreenPressed) {
+    panel1Color = GREEN_COLOR;
+  }
+  panel1GreenPressed = comms.GreenButtonPressed;
+
+  if (comms.BlueButtonPressed && !panel1BluePressed) {
+    panel1Color = BLUE_COLOR;
+  }
+  panel1BluePressed = comms.BlueButtonPressed;
+
+  // Color fill
+
+  // shift every pixel one forward
+  shiftPanel(PANEL1);
+
+  // shift in active color
+  unsigned first = config.panelFirst[PANEL1];
+  panelPixels[first] = panel1Color;
+
+  if (millis() - panelLastActive[PANEL1] > config.activeTimeout * 1000) {
+    panelActive[PANEL1] = false;
+  }
 }
 
 /* Panel 2 interaction: flow current color
@@ -233,30 +294,20 @@ void updatePanel2() {
     return;
   }
 
-  if (millis() - panelLastUpdate[PANEL2] < config.colorFillDelay) {
+  if (millis() - panelLastUpdate[PANEL2] < config.colorFlowDelay) {
     return;
   }
   panelLastUpdate[PANEL2] = millis();
 
-  // FIXME: HACK!
-  unsigned x = analogRead(BRIGHTNESS_PIN) / 16 + 1;
-  if (x > 255) {
-    x = 255;
-  }
-  comms.InputColorHue = x;
-  // FIXME: end HACK!
-
   // Color flow
 
   // shift every pixel one forward
-  unsigned first = config.panelFirst[PANEL2];
-  for (unsigned i = first + config.panelSize[PANEL2] - 1; i > first; i--) {
-    panelPixels[i] = panelPixels[i - 1];
-  }
+  shiftPanel(PANEL2);
 
   // Compute RGB of input hue
   RgbColor rgb = HsvToRgb(HsvColor(comms.InputColorHue, 255, 255));
   uint32_t c = strip.Color(rgb.r, rgb.g, rgb.b);
+  unsigned first = config.panelFirst[PANEL2];
   panelPixels[first] = c;
 
   if (millis() - panelLastActive[PANEL2] > config.activeTimeout * 1000) {
@@ -285,16 +336,11 @@ void updatePanel3() {
     return;
   }
 
-  // FIXME: HACK!
-  float x = analogRead(BRIGHTNESS_PIN) / 1024.0;
-  comms.InputCrankSpeed = x;
-  // FIXME: end HACK!
-
   long bulletDelay = config.bulletBaseDelay;
   if (comms.InputCrankSpeed > 0.1) {
     bulletDelay = (long) (bulletDelay / comms.InputCrankSpeed);
   }
-  Serial.printlnf("crank=%f base=%d delay=%d", x, config.bulletBaseDelay, bulletDelay);
+  //Serial.printlnf("crank=%f base=%d delay=%d", comms.InputCrankSpeed, config.bulletBaseDelay, bulletDelay);
 
   if (millis() - panelLastUpdate[PANEL3] < bulletDelay) {
     return;
@@ -333,10 +379,6 @@ uint8_t leftHue = 0;
 uint8_t rightHue = 0;
 
 void updatePanel4() {
-  // FIXME: HACK!
-  comms.Input4Active = Serial.available();
-  // FIXME: end HACK!
-
   if (comms.Input4Active) {
     // panel just became active
     if (!panelActive[PANEL4]) {
@@ -353,21 +395,6 @@ void updatePanel4() {
     return;
   }
   panelLastUpdate[PANEL4] = millis();
-
-  // FIXME: HACK!
-  comms.LeftJoystickUp = 0;
-  comms.LeftJoystickDown = 0;
-  comms.RightJoystickUp = 0;
-  comms.RightJoystickDown = 0;
-  if (Serial.available()) {
-    switch (Serial.read()) {
-      case 'q': comms.LeftJoystickUp = 1; break;
-      case 'a': comms.LeftJoystickDown = 1; break;
-      case 'w': comms.RightJoystickUp = 1; break;
-      case 's': comms.RightJoystickDown = 1; break;
-    }
-  }
-  // FIXME: end HACK!
 
   // Change left and right hue depending on the joysticks.
   // Linearly interpolate between the 2 hues
@@ -495,6 +522,8 @@ int updateConfig(String arg) {
         config.activeTimeout = value.toInt();
     } else if (name.equals("colorFillDelay")) {
         config.colorFillDelay = value.toInt();
+    } else if (name.equals("colorFlowDelay")) {
+        config.colorFlowDelay = value.toInt();
     } else if (name.equals("bulletBaseDelay")) {
         config.bulletBaseDelay = value.toInt();
     } else if (name.equals("hueSliderDelay")) {
