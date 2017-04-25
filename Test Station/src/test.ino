@@ -21,9 +21,10 @@ void setup() {
 }
 
 void loop() {
-  comms.Input1Active = digitalRead(SWITCH1_PIN);
+  comms.Input3Active = digitalRead(SWITCH1_PIN);
   comms.Input2Active = digitalRead(SWITCH2_PIN);
   comms.receive();
   comms.transmit(MachineModules::Panel1);
   comms.transmit(MachineModules::Panel2);
+  comms.transmit(MachineModules::Panel3);
 }
