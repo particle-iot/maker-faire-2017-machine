@@ -30,10 +30,12 @@ void setup()
 
 void loop()
 {
-    if (prevPos != encoderPos)
+    // copy to local var to avoid multiple access to global that changes in interrupt
+    int pos = encoderPos;
+    if (prevPos != pos)
     {
-        prevPos = encoderPos;
-        Serial.println(encoderPos);
+        prevPos = pos;
+        Serial.println(pos);
     }
     delay(50);
 }
