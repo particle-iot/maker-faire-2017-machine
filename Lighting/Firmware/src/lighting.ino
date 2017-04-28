@@ -14,12 +14,13 @@ using namespace std;
 //#define MINI_MODE
 
 SYSTEM_THREAD(ENABLED);
+SYSTEM_MODE(MANAL);
 
 BuiltinCAN can(CAN_D1_D2);
 Communication comms(can);
 
 // Neopixel strip
-const auto PIXEL_PIN = A1;
+const auto PIXEL_PIN = A0;
 #ifdef MINI_MODE
 const auto PIXEL_COUNT = 56;
 const auto PIXEL_TYPE = WS2812B;
@@ -68,10 +69,10 @@ Config defaultConfig = {
   /* theaterChaseDuration */ 8,
   /* panelFirst */ { 0, 75, 150, 225 },
   /* panelCount */ { 75, 75, 75, 75 },
-  /* activeTimeout */ 30,
+  /* activeTimeout */ 15,
   /* colorFillDelay */ 20,
   /* colorFlowDelay */ 30,
-  /* bulletBaseDelay */ 100,
+  /* bulletBaseDelay */ 20,
   /* hueSliderDelay */ 20,
 };
 #endif
