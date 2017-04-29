@@ -22,7 +22,7 @@ https://github.com/spark/library-beam-detector
 
 <img src="assembled.jpg">
 
-- 3d print the bracket.
+- 3d print the bracket. I used 0.2 mm layer height, 5% rectilinear infill.
 - Insert the laser diode loosely. If the laser diode is too loose or doesn't fit in the hole,
   tweak the diameter in Fusion 360 and print again. If it is a tad too
   tight, manually turn a 15/64" drill bit in the hole to remove some of
