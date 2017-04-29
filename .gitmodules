@@ -1,12 +1,15 @@
 [submodule "Firmware Libraries/particle-simple-storage"]
 	path = Firmware Libraries/particle-simple-storage
 	url = git@github.com:monkbroc/particle-simple-storage.git
-[submodule "Firmware Libraries/particle-mf2017-can"]
-	path = Firmware Libraries/particle-mf2017-can
-	url = git@github.com:spark/particle-mf2017-can.git
 [submodule "Lighting/lib/particle-mf2017-can"]
 	path = Lighting/lib/particle-mf2017-can
 	url = git@github.com:spark/particle-mf2017-can.git
 [submodule "Firmware Libraries/particle-hsv"]
 	path = Firmware Libraries/particle-hsv
 	url = git@github.com:monkbroc/particle-hsv.git
+[submodule "Firmware Libraries/library-beam-detector"]
+	path = Firmware Libraries/library-beam-detector
+	url = git@github.com:spark/library-beam-detector.git
+[submodule "Firmware Libraries/library-mf2017-can"]
+	path = Firmware Libraries/library-mf2017-can
+	url = git@github.com:spark/library-mf2017-can.git
