@@ -10,6 +10,10 @@
 
 <img src="Circuit diagram_schem.png">
 
+Open points / suggestions:
+- Use a potentiometer instead of a fixed pull down resistor for the photoresistor to allow calibrating the edges on site. 2 kOhm potentiometer suggested.
+- Add a low-pass RC filter to the light level pin to filter out high frequency noise.
+
 ## Software Library
 
 https://github.com/spark/library-beam-detector
