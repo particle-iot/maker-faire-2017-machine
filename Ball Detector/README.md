@@ -8,7 +8,7 @@
 
 ## Circuit
 
-![circuit](/Ball Detector/Circuit diagram_schem.png)
+<img src="Circuit diagram_schem.png">
 
 ## Software Library
 
