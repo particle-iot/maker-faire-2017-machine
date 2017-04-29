@@ -18,11 +18,13 @@ https://github.com/spark/library-beam-detector
 
 <img src="assembled.jpg">
 
-- 3d print the bracket. If the laser diode is too loose or tight in the hole,
-  tweak the diameter in Fusion 360 and print again.
+- 3d print the bracket.
+- Insert the laser diode loosely. If the laser diode is too loose or doesn't fit in the hole,
+  tweak the diameter in Fusion 360 and print again. If it is a tad too
+  tight, manually turn a 15/64" drill bit in the hole to remove some of
+  the imperfections from the print.
 - Insert the photoresistor. I like cutting one leg shorter than the
 other so I can insert them one at at time in the tiny holes.
-- Insert the laser diode loosely.
 - Connect a multimeter to the photoresistor in resistance measurement mode.
 - Connect a power supply (3.3V or 5V) to the laser diode. Blue is ground, red is positive.
 - Rotate the laser diode in the hole to get the smallest resistance measurement on the photoresistor.
