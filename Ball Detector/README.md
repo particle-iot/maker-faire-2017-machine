@@ -16,6 +16,8 @@ https://github.com/spark/library-beam-detector
 
 ## Assembly
 
+<img src="assembled.jpg">
+
 - 3d print the bracket. If the laser diode is too loose or tight in the hole,
   tweak the diameter in Fusion 360 and print again.
 - Insert the photoresistor. I like cutting one leg shorter than the
