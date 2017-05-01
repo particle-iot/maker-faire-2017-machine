@@ -13,3 +13,6 @@
 [submodule "Firmware Libraries/library-mf2017-can"]
 	path = Firmware Libraries/library-mf2017-can
 	url = git@github.com:spark/library-mf2017-can.git
+[submodule "Firmware Libraries/Encoder"]
+	path = Firmware Libraries/Encoder
+	url = git@github.com:monkbroc/Encoder.git

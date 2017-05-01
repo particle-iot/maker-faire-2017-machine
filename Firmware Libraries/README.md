@@ -17,3 +17,7 @@ Ball detector using a laser break beam
 ## HSV
 
 Convert between red/green/blue colors and hue/saturation/value colors.
+
+## Encoder
+
+Count pulses from a quadrature rotary encoder.
