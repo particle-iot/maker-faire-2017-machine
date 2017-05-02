@@ -1,13 +1,6 @@
 /*
  * Panel 3: Rotary encoder and ball wheel
  * 
- * Pin usage:
- * D0: Ball detector laser enable
- * D1, D2: CAN bus
- * D3, D4: Input crank encoder (may be changed)
- * D5, D6: Ball wheel encoder (may be changed)
- * A1: Ball detector 1
- * A2: Ball detector 2
  */
 
 #include "mf2017-can.h"
@@ -17,7 +10,7 @@
 
 SYSTEM_THREAD(ENABLED);
 
-/* Define AUTO_START to true during testing and false during the event
+/* Define AUTO_START to true during testing and false during the event.
  * It decides whether to wait for the MachineStart flag to turn on the
  * mechanisms or auto-start everything at boot.
  */
@@ -26,41 +19,63 @@ const bool AUTO_START = true;
 // The main flag to enable or disable mechanisms
 bool runMachine = AUTO_START;
 
-/* CAN communication
+/*
+ * Pin usage:
  */
-BuiltinCAN can(CAN_D1_D2);
+
+const auto LASER_ENABLE_PIN = D0;
+const auto CAN_BUS_PINS = CAN_D1_D2;
+const auto INPUT_CRANK_ENCODER_A_PIN = D3;
+const auto INPUT_CRANK_ENCODER_B_PIN = D4;
+const auto BALL_WHEEL_ENCODER_A_PIN = D5;
+const auto BALL_WHEEL_ENCODER_B_PIN = D6;
+const auto BALL_DETECTOR_1_PIN = A1;
+const auto BALL_DETECTOR_2_PIN = A2;
+const auto BALL_WHEEL_MOTOR_PWM_PIN = A5;
+
+/*
+ * CAN communication
+ */
+BuiltinCAN can(CAN_BUS_PINS);
 Communication comms(can);
 
-/* Input crank encoder
+/*
+ * Input crank encoder
  */
-Encoder inputEncoder(D3, D4);
+Encoder inputEncoder(INPUT_CRANK_ENCODER_A_PIN, INPUT_CRANK_ENCODER_B_PIN);
 
-/* Ball wheel encoder
+/*
+ * Ball wheel encoder
  */
-Encoder wheelEncoder(D5, D6);
+Encoder wheelEncoder(BALL_WHEEL_ENCODER_A_PIN, BALL_WHEEL_ENCODER_B_PIN);
 
-/* Ball detectors
+/*
+ * Ball detectors
  */
-BeamDetector detector1(A1, D0);
-BeamDetector detector2(A2, D0);
+BeamDetector detector1(BALL_DETECTOR_1_PIN, LASER_ENABLE_PIN);
+BeamDetector detector2(BALL_DETECTOR_2_PIN, LASER_ENABLE_PIN);
 
-/* Config stored in EEPROM
+/*
+ * Config stored in EEPROM
  */
 struct Config {
   uint32_t app;
   uint32_t ballCount;
-  uint16_t inputCrankPulsePerRevolution;
+  uint16_t inputCrankPulsesPerRevolution;
+  uint16_t ballWheelMotorFrequency;
 } config;
 
 Config defaultConfig = {
   /* app */ APP_CODE('M', 'F', '3', 0), // increment last digit to reset EEPROM on boot
   /* ballCount */ 0,
-  /* inputCrankPulsePerRevolution */ 600,
+  /* inputCrankPulsesPerRevolution */ 600,
+  /* ballWheelMotorFrequency */ 16000,
 };
 
 Storage<Config> storage(defaultConfig);
 
-/* SETUP
+/*
+ * SETUP
  */
 
 void setup() {
@@ -68,9 +83,11 @@ void setup() {
   loadStorage();
   setupComms();
   setupDetectors();
+  setupMotor();
 }
 
-/* LOOP
+/*
+ * LOOP
  */
 
 void loop() {
@@ -84,7 +101,8 @@ void loop() {
   storeBallCount();
 }
 
-/* Beam detectors
+/*
+ * Beam detectors
  */
 
 bool beamBroken1 = false;
@@ -114,7 +132,8 @@ void updateDetectors() {
   }
 }
 
-/* Input crank
+/*
+ * Input crank
  */
 
 uint32_t inputCrankLastUpdate = 0;
@@ -146,17 +165,27 @@ void readInputCrank() {
 }
 
 void updateInputCrankFactor() {
-  inputCrankFactor = 1000.0 / (config.inputCrankPulsePerRevolution * inputCrankInterval);
+  inputCrankFactor = 1000.0 / (config.inputCrankPulsesPerRevolution * inputCrankInterval);
 }
 
-/* Motor control
+/*
+ * Motor control
  */
+
+uint16_t motorPWM = 0;
+
+void setupMotor() {
+  pinMode(BALL_WHEEL_MOTOR_PWM_PIN, OUTPUT);
+}
 
 void controlMotor() {
   // TODO
+
+  analogWrite(BALL_WHEEL_MOTOR_PWM_PIN, runMachine ? motorPWM : 0, config.ballWheelMotorFrequency);
 }
 
-/* CAN communication
+/*
+ * CAN communication
  */
 
 void setupComms() {
@@ -179,7 +208,8 @@ void transmitComms() {
   comms.transmit(MachineModules::Panel3);
 }
 
-/* Debug printing
+/*
+ * Debug printing
  */
 
 uint32_t printLastUpdate = 0;
@@ -199,18 +229,19 @@ void printStatus() {
   );
 }
 
-/* Cloud functionality
+/*
+ * Cloud functionality
  */
 void registerCloud() {
   static bool registered = false;
   if (!registered && Particle.connected()) {
     registered = true;
-    Particle.function("set", updateConfig);
+    Particle.function("set", setConfigFromCloud);
   }
 }
 
-// Call Particle cloud function "set" with name=value to update a config value
-int updateConfig(String arg) {
+// Call Particle cloud function "set" with name=value to change a config value
+int setConfigFromCloud(String arg) {
     int equalPos = arg.indexOf('=');
     if (equalPos < 0) {
         return -1;
@@ -221,10 +252,12 @@ int updateConfig(String arg) {
     if (name.equals("ballCount")) {
       config.ballCount = value.toInt();
       ballCount = config.ballCount;
-    } else if (name.equals("inputCrankPulsePerRevolution")) {
-      config.inputCrankPulsePerRevolution = value.toInt();
+    } else if (name.equals("inputCrankPulsesPerRevolution")) {
+      config.inputCrankPulsesPerRevolution = value.toInt();
       // recompute cached factor
       updateInputCrankFactor();
+    } else if (name.equals("ballWheelMotorFrequency")) {
+      config.ballWheelMotorFrequency = value.toInt();
     } else {
       return -2;
     }
@@ -233,7 +266,8 @@ int updateConfig(String arg) {
     return 0;
 }
 
-/* Storage
+/*
+ * Persistent storage
  */
 
 void loadStorage() {
