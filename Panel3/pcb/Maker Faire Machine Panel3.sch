@@ -9483,12 +9483,12 @@ Source: AVX .. aphvc.pdf</description>
 <part name="Q1" library="SparkFun-DiscreteSemi" deviceset="TRANSISTOR_NPN" device="TO92"/>
 <part name="GND1" library="SparkFun-Aesthetics" deviceset="GND" device=""/>
 <part name="R1" library="SparkFun-Passives" deviceset="RESISTOR" device="1206" value="1k"/>
-<part name="C1" library="SparkFun-Passives" deviceset="CAP" device="1206" value="0.1uF"/>
+<part name="C1" library="SparkFun-Passives" deviceset="CAP" device="1206" value="0.01uF"/>
 <part name="R2" library="SparkFun-Passives" deviceset="RESISTOR" device="1206" value="1k"/>
 <part name="GND2" library="SparkFun-Aesthetics" deviceset="GND" device=""/>
 <part name="GND3" library="SparkFun-Aesthetics" deviceset="GND" device=""/>
 <part name="R3" library="SparkFun-Passives" deviceset="POTENTIOMETER" device="" value="2k"/>
-<part name="C2" library="SparkFun-Passives" deviceset="CAP" device="1206" value="0.1uF"/>
+<part name="C2" library="SparkFun-Passives" deviceset="CAP" device="1206" value="0.01uF"/>
 <part name="R4" library="SparkFun-Passives" deviceset="RESISTOR" device="1206" value="1k"/>
 <part name="GND4" library="SparkFun-Aesthetics" deviceset="GND" device=""/>
 <part name="GND5" library="SparkFun-Aesthetics" deviceset="GND" device=""/>

@@ -1826,8 +1826,8 @@ design rules under a new name.
 </pass>
 </autorouter>
 <elements>
-<element name="C1" library="SparkFun-Passives" package="1206" value="0.1uF" x="82.55" y="63.5"/>
-<element name="C2" library="SparkFun-Passives" package="1206" value="0.1uF" x="82.55" y="41.91"/>
+<element name="C1" library="SparkFun-Passives" package="1206" value="0.01uF" x="82.55" y="63.5"/>
+<element name="C2" library="SparkFun-Passives" package="1206" value="0.01uF" x="82.55" y="41.91"/>
 <element name="D1" library="SparkFun-DiscreteSemi" package="SMA-DIODE" value="" x="36.83" y="74.93"/>
 <element name="JP1" library="SparkFun-Connectors" package="SCREWTERMINAL-3.5MM-4" value="" x="92.71" y="71.12" rot="R90"/>
 <element name="JP2" library="SparkFun-Connectors" package="SCREWTERMINAL-3.5MM-4" value="" x="92.71" y="49.53" rot="R90"/>
