@@ -9516,7 +9516,7 @@ Source: AVX .. aphvc.pdf</description>
 <attribute name="PARTNO" value="12065C104KAT2A"/>
 </part>
 <part name="GND7" library="SparkFun-Aesthetics" deviceset="GND" device=""/>
-<part name="JP3" library="SparkFun-Connectors" deviceset="M02" device="3.5MM"/>
+<part name="JP9" library="SparkFun-Connectors" deviceset="M02" device="3.5MM"/>
 <part name="JP4" library="SparkFun-Connectors" deviceset="M04" device="SCREW"/>
 <part name="JP5" library="SparkFun-Connectors" deviceset="M04" device="SCREW"/>
 <part name="GND8" library="SparkFun-Aesthetics" deviceset="GND" device=""/>
@@ -9525,6 +9525,7 @@ Source: AVX .. aphvc.pdf</description>
 <part name="JP7" library="SparkFun-Connectors" deviceset="POWER_JACK" device="PTH"/>
 <part name="SUPPLY5" library="SparkFun-Aesthetics" deviceset="5V" device=""/>
 <part name="GND10" library="SparkFun-Aesthetics" deviceset="GND" device=""/>
+<part name="JP8" library="SparkFun-Connectors" deviceset="M02" device="3.5MM"/>
 </parts>
 <sheets>
 <sheet>
@@ -9598,7 +9599,7 @@ center positive</text>
 <attribute name="PARTNO" x="180.34" y="-33.02" size="1.778" layer="96" rot="R90" display="off"/>
 </instance>
 <instance part="GND7" gate="1" x="180.34" y="-40.64"/>
-<instance part="JP3" gate="G$1" x="251.46" y="-43.18" rot="R180"/>
+<instance part="JP9" gate="G$1" x="251.46" y="-43.18" rot="R180"/>
 <instance part="JP4" gate="G$1" x="106.68" y="-30.48" rot="R180"/>
 <instance part="JP5" gate="G$1" x="106.68" y="-55.88" rot="R180"/>
 <instance part="GND8" gate="1" x="48.26" y="63.5"/>
@@ -9607,6 +9608,7 @@ center positive</text>
 <instance part="JP7" gate="G$1" x="86.36" y="12.7"/>
 <instance part="SUPPLY5" gate="G$1" x="99.06" y="20.32"/>
 <instance part="GND10" gate="1" x="99.06" y="12.7"/>
+<instance part="JP8" gate="G$1" x="251.46" y="-30.48" rot="R180"/>
 </instances>
 <busses>
 </busses>
@@ -9954,9 +9956,14 @@ center positive</text>
 <net name="CANH" class="0">
 <segment>
 <pinref part="IC1" gate="G$1" pin="CANH"/>
-<wire x1="213.36" y1="-43.18" x2="243.84" y2="-43.18" width="0.1524" layer="91"/>
+<wire x1="213.36" y1="-43.18" x2="241.3" y2="-43.18" width="0.1524" layer="91"/>
 <label x="233.68" y="-43.18" size="1.778" layer="95"/>
-<pinref part="JP3" gate="G$1" pin="1"/>
+<pinref part="JP9" gate="G$1" pin="1"/>
+<pinref part="JP8" gate="G$1" pin="1"/>
+<wire x1="241.3" y1="-43.18" x2="243.84" y2="-43.18" width="0.1524" layer="91"/>
+<wire x1="243.84" y1="-30.48" x2="241.3" y2="-30.48" width="0.1524" layer="91"/>
+<wire x1="241.3" y1="-30.48" x2="241.3" y2="-43.18" width="0.1524" layer="91"/>
+<junction x="241.3" y="-43.18"/>
 </segment>
 </net>
 <net name="CANL" class="0">
@@ -9964,7 +9971,10 @@ center positive</text>
 <pinref part="IC1" gate="G$1" pin="CANL"/>
 <wire x1="213.36" y1="-45.72" x2="243.84" y2="-45.72" width="0.1524" layer="91"/>
 <label x="233.68" y="-45.72" size="1.778" layer="95"/>
-<pinref part="JP3" gate="G$1" pin="2"/>
+<pinref part="JP9" gate="G$1" pin="2"/>
+<pinref part="JP8" gate="G$1" pin="2"/>
+<wire x1="243.84" y1="-33.02" x2="243.84" y2="-45.72" width="0.1524" layer="91"/>
+<junction x="243.84" y="-45.72"/>
 </segment>
 </net>
 <net name="N$3" class="0">
