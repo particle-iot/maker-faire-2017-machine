@@ -31,7 +31,8 @@ const auto BALL_WHEEL_ENCODER_A_PIN = D5;
 const auto BALL_WHEEL_ENCODER_B_PIN = D6;
 const auto BALL_DETECTOR_1_PIN = A1;
 const auto BALL_DETECTOR_2_PIN = A2;
-const auto BALL_WHEEL_MOTOR_PWM_PIN = A5;
+const auto BALL_WHEEL_KILL_SWITCH_PIN = A5;
+const auto BALL_WHEEL_MOTOR_SPEED_PIN = DAC;
 
 /*
  * CAN communication
@@ -62,14 +63,15 @@ struct Config {
   uint32_t app;
   uint32_t ballCount;
   uint16_t inputCrankPulsesPerRevolution;
-  uint16_t ballWheelMotorFrequency;
+  float ballWheelSpeedFactor;
+  uint16_t ballWheelMinSpeed;
+  uint16_t ballWheelMaxSpeed;
 } config;
 
 Config defaultConfig = {
   /* app */ APP_CODE('M', 'F', '3', 0), // increment last digit to reset EEPROM on boot
   /* ballCount */ 0,
   /* inputCrankPulsesPerRevolution */ 600,
-  /* ballWheelMotorFrequency */ 16000,
 };
 
 Storage<Config> storage(defaultConfig);
@@ -143,9 +145,11 @@ float inputCrankSpeed = 0;
 float inputCrankFactor = 0;
 
 void readInputCrank() {
-  if (millis() - inputCrankLastUpdate < inputCrankInterval) {
+  auto now = millis();
+  if (now - inputCrankLastUpdate < inputCrankInterval) {
     return;
   }
+  inputCrankLastUpdate = now;
 
   long position = inputEncoder.read();
   long deltaPosition = position - lastInputCrankPosition;
@@ -172,16 +176,69 @@ void updateInputCrankFactor() {
  * Motor control
  */
 
-uint16_t motorPWM = 0;
+const auto MOTOR_RUN = LOW;
+const auto MOTOR_KILL = HIGH;
+
+auto motorState = AUTO_START ? MOTOR_RUN : MOTOR_KILL;
+uint32_t motorSpeed = 0;
+
+uint32_t motorControlLastUpdate = 0;
+const auto motorControlkInterval = 100;
+const auto motorStallMaxTime = 1000;
+long motorPosition = 0;
+long oldMotorPosition = 0;
+uint16_t motorStallCounter = 0;
 
 void setupMotor() {
-  pinMode(BALL_WHEEL_MOTOR_PWM_PIN, OUTPUT);
+  pinMode(BALL_WHEEL_KILL_SWITCH_PIN, OUTPUT);
+  digitalWrite(BALL_WHEEL_KILL_SWITCH_PIN, MOTOR_KILL);
+  pinMode(BALL_WHEEL_MOTOR_SPEED_PIN, OUTPUT);
 }
 
 void controlMotor() {
-  // TODO
+  auto now = millis();
+  if (now - motorControlLastUpdate < motorControlInterval) {
+    return;
+  }
+  motorControlLastUpdate = now;
 
-  analogWrite(BALL_WHEEL_MOTOR_PWM_PIN, runMachine ? motorPWM : 0, config.ballWheelMotorFrequency);
+  // Scale input crank speed to a voltage in the 0-3.3V range to send to
+  // the motor controller
+  auto maxSpeed = max(config.ballWheelMaxSpeed, 4095);
+  motorSpeed = (uint32_t)(inputCrankSpeed * config.ballWheelSpeedFactor) + config.ballWheelMinSpeed;
+
+  if (motorSpeed > maxSpeed) {
+    motorSpeed = maxSpeed;
+  }
+
+  motorPosition = wheelEncoder.read();
+
+  // Safety setting of the motor
+  // if the desired motor speed > 0 and there were no pulses on the encoder for 1 second,
+  // trigger the motor controller kill switch until the machine start button is pressed again
+  if (inputCrankSpeed > 0) {
+    if (motorPosition == oldMotorPosition) {
+      motorStallCounter++;
+    }
+  } else {
+    motorStallCounter = 0;
+  }
+
+  // Stop the motor when the machine stop button is pressed
+  // Start the motor when the machine start button is pressed
+  // Stop the motor when the motor is powered but not moving
+  if (!runMachine) {
+    motorState = MOTOR_KILL;
+  } else if (comms.MachineStart) {
+    motorState = MOTOR_RUN;
+  } else if (motorStallCounter > motorStallMaxTime / motorControlInterval) {
+    motorState = MOTOR_KILL;
+  }
+
+  oldMotorPosition = motorPosition;
+
+  digitalWrite(BALL_WHEEL_KILL_SWITCH_PIN, motorState);
+  analogWrite(BALL_WHEEL_MOTOR_SPEED_PIN, runMachine ? motorSpeed : 0);
 }
 
 /*
@@ -256,8 +313,6 @@ int setConfigFromCloud(String arg) {
       config.inputCrankPulsesPerRevolution = value.toInt();
       // recompute cached factor
       updateInputCrankFactor();
-    } else if (name.equals("ballWheelMotorFrequency")) {
-      config.ballWheelMotorFrequency = value.toInt();
     } else {
       return -2;
     }
