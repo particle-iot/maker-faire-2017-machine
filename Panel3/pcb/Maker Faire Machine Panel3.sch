@@ -9681,6 +9681,10 @@ terminal block</text>
 <approved hash="113,1,249.597,-42.9853,JP8,,,,,"/>
 <approved hash="113,1,-54.0173,56.0747,JP11,,,,,"/>
 <approved hash="113,1,71.7973,56.0747,JP12,,,,,"/>
+<approved hash="113,1,90.4452,-43.18,R5,,,,,"/>
+<approved hash="113,1,98.0652,-43.18,R7,,,,,"/>
+<approved hash="113,1,90.4452,-73.66,R8,,,,,"/>
+<approved hash="113,1,98.0652,-73.66,R9,,,,,"/>
 </errors>
 </schematic>
 </drawing>
