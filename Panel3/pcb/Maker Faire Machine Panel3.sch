@@ -8709,7 +8709,7 @@ Basic schematic elements and footprints for 0603, 1206, and PTH resistors.</desc
 </classes>
 <parts>
 <part name="U$1" library="Particle-Devices" deviceset="PHOTON_SMD" device=""/>
-<part name="Q1" library="SparkFun-DiscreteSemi" deviceset="TRANSISTOR_NPN" device="TO92">
+<part name="Q1" library="SparkFun-DiscreteSemi" deviceset="TRANSISTOR_NPN" device="TO-92-AMMO">
 <attribute name="PARTNO" value="PN2222ABU"/>
 </part>
 <part name="GND1" library="SparkFun-Aesthetics" deviceset="GND" device=""/>
@@ -8781,7 +8781,7 @@ Basic schematic elements and footprints for 0603, 1206, and PTH resistors.</desc
 <part name="JP10" library="SparkFun-Connectors" deviceset="M03" device="SCREW">
 <attribute name="PARTNO" value="OSTTE030104"/>
 </part>
-<part name="Q2" library="SparkFun-DiscreteSemi" deviceset="TRANSISTOR_NPN" device="TO92">
+<part name="Q2" library="SparkFun-DiscreteSemi" deviceset="TRANSISTOR_NPN" device="TO-92-AMMO">
 <attribute name="PARTNO" value="PN2222ABU"/>
 </part>
 <part name="GND11" library="SparkFun-Aesthetics" deviceset="GND" device=""/>
