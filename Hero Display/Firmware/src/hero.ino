@@ -21,6 +21,7 @@ SocketCAN can("can0");
 Communication comms(can);
 
 void setup() {
+  Serial.begin(9600);
   setupComms();
   setupButtons();
 }
@@ -53,7 +54,9 @@ void processButtons() {
  */
 
 void setupComms() {
+  Serial.println("setupComms start");
   comms.begin();
+  Serial.println("setupComms end");
 }
 
 void receiveComms() {
@@ -71,7 +74,8 @@ void transmitComms() {
  */
 
 const auto dataFile = "/home/pi/website/data.json";
-#define JSON_SIGNAL(name) file << "\"" << #name << "\":" << comms.name << ",\n"
+#define JSON_SIGNAL(name) file << "  \"" << #name << "\":" << comms.name << ",\n"
+#define JSON_SIGNAL_INT(name) file << "  \"" << #name << "\":" << (int)(comms.name) << ",\n"
 
 long exportLastTime = 0;
 void exportDataToJSON() {
@@ -83,7 +87,7 @@ void exportDataToJSON() {
 
   ofstream file;
   file.open(dataFile);
-  file << "{";
+  file << "{\n";
   JSON_SIGNAL(MachineStart);
   JSON_SIGNAL(MachineStop);
   JSON_SIGNAL(Input1Active);
@@ -91,7 +95,7 @@ void exportDataToJSON() {
   JSON_SIGNAL(BlueButtonPressed);
   JSON_SIGNAL(RedButtonPressed);
   JSON_SIGNAL(Input2Active);
-  JSON_SIGNAL(InputColorHue);
+  JSON_SIGNAL_INT(InputColorHue);
   JSON_SIGNAL(Input3Active);
   JSON_SIGNAL(InputCrankSpeed);
   JSON_SIGNAL(Input4Active);

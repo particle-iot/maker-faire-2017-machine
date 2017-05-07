@@ -59,4 +59,17 @@ interface eth0
 static ip_address=192.168.1.1/24
 ```
 
+### Install particle-agent
+
+```
+bash <( curl -sL https://particle.io/install-pi )
+```
+
+Log in with software+mf2017@particle.io
+
+### Install web server
+
+```
+sudo apt install nginx
+```
 
