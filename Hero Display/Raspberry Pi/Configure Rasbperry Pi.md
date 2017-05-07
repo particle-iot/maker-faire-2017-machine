@@ -47,3 +47,16 @@ Install CAN utils `sudo apt install can-utils`
 CAN utils are user applications that use the Linux socketcan interface
 to send, receive and dump CAN message.
 
+### Set static IP on network card
+
+```
+sudo vim /etc/dhcpcd.conf
+```
+
+Paste at the end:
+```
+interface eth0
+static ip_address=192.168.1.1/24
+```
+
+
