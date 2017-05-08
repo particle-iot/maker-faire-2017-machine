@@ -4,9 +4,7 @@
 
 #include "mf2017-can.h"
 #include "socketcan.h"
-#include <iostream>
-#include <fstream>
-using namespace std;
+#include <stdio.h>
 
 SYSTEM_THREAD(ENABLED);
 
@@ -31,6 +29,12 @@ void loop() {
   processButtons();
   exportDataToJSON();
   transmitComms();
+
+  static long t = 0;
+  if (millis() - t > 1000) {
+    t = millis();
+    Serial.printlnf("%f", comms.InputCrankSpeed);
+  }
 }
 
 /*
@@ -74,10 +78,11 @@ void transmitComms() {
  */
 
 const auto dataFile = "/home/pi/website/data.json";
-#define JSON_SIGNAL(name) file << "  \"" << #name << "\":" << comms.name << ",\n"
-#define JSON_SIGNAL_INT(name) file << "  \"" << #name << "\":" << (int)(comms.name) << ",\n"
+#define JSON_SIGNAL_INT(name) fprintf(file, "  \"%s\": %d,\n", #name, comms.name)
+#define JSON_SIGNAL_FLOAT(name) fprintf(file, "  \"%s\": %f,\n", #name, comms.name)
 
 long exportLastTime = 0;
+float junk;
 void exportDataToJSON() {
   auto now = millis();
   if (now - exportLastTime < 100) {
@@ -85,21 +90,20 @@ void exportDataToJSON() {
   }
   exportLastTime = now;
 
-  ofstream file;
-  file.open(dataFile);
-  file << "{\n";
-  JSON_SIGNAL(MachineStart);
-  JSON_SIGNAL(MachineStop);
-  JSON_SIGNAL(Input1Active);
-  JSON_SIGNAL(GreenButtonPressed);
-  JSON_SIGNAL(BlueButtonPressed);
-  JSON_SIGNAL(RedButtonPressed);
-  JSON_SIGNAL(Input2Active);
+  FILE *file = fopen(dataFile, "w");
+  fprintf(file, "{\n");
+  JSON_SIGNAL_INT(MachineStart);
+  JSON_SIGNAL_INT(MachineStop);
+  JSON_SIGNAL_INT(Input1Active);
+  JSON_SIGNAL_INT(GreenButtonPressed);
+  JSON_SIGNAL_INT(BlueButtonPressed);
+  JSON_SIGNAL_INT(RedButtonPressed);
+  JSON_SIGNAL_INT(Input2Active);
   JSON_SIGNAL_INT(InputColorHue);
-  JSON_SIGNAL(Input3Active);
-  JSON_SIGNAL(InputCrankSpeed);
-  JSON_SIGNAL(Input4Active);
-  JSON_SIGNAL(LightsActive);
-  file << "}";
-  file.close();
+  JSON_SIGNAL_INT(Input3Active);
+  JSON_SIGNAL_FLOAT(InputCrankSpeed);
+  JSON_SIGNAL_INT(Input4Active);
+  JSON_SIGNAL_INT(LightsActive);
+  fprintf(file, "}");
+  fclose(file);
 }
