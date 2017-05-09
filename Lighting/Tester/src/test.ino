@@ -14,7 +14,12 @@ enum ButtonColor {
   BUTTON_GREEN,
   BUTTON_BLUE
 };
+enum LimitSwitch {
+  LIMIT_LEFT,
+  LIMIT_RIGHT
+};
 void updateButton(ButtonColor button);
+void updateLimit(LimitSwitch limit);
 
 void setup() {
   Serial.begin();
@@ -54,10 +59,26 @@ void loop() {
       case '8': updateCrankSpeed(8); break;
       case '9': updateCrankSpeed(9); break;
 
-      case 'a': updateJoystick(1, 0); break;
-      case 'z': updateJoystick(-1, 0); break;
-      case 's': updateJoystick(0, 1); break;
-      case 'x': updateJoystick(0, -1); break;
+      case 'a': updateHandLR(0); break;
+      case 's': updateHandLR(1); break;
+      case 'd': updateHandLR(2); break;
+      case 'f': updateHandLR(3); break;
+      case 'g': updateHandLR(4); break;
+      case 'h': updateHandLR(5); break;
+      case 'j': updateHandLR(6); break;
+      case 'k': updateHandLR(7); break;
+      case 'l': updateHandLR(8); break;
+
+      case 'z': updateHandUD(0); break;
+      case 'x': updateHandUD(1); break;
+      case 'c': updateHandUD(2); break;
+      case 'v': updateHandUD(3); break;
+      case 'b': updateHandUD(4); break;
+      case 'n': updateHandUD(5); break;
+      case 'm': updateHandUD(6); break;
+
+      case ';': updateLimit(LIMIT_LEFT); break;
+      case '\'': updateLimit(LIMIT_RIGHT); break;
 
     }
   }
@@ -79,7 +100,8 @@ void printHelp() {
     "Panel 1: , for red, . for green, / for blue\r\n"
     "Panel 2: q to p for hue\r\n"
     "Panel 3: 0 to 9 for input crank speed\r\n"
-    "Panel 4: a and z for left joystick, s and x for right joystick\r\n"
+    "Panel 4: a to l for hand left/right, z to m for hand up/down,\r\n"
+    "         ; and ' for limit switches\r\n"
   );
 }
 
@@ -93,11 +115,7 @@ void clearInput() {
 
   // comms.Input3Active is deactivated with the 0 key
 
-  comms.Input4Active = false;
-  comms.LeftJoystickUp    = false;
-  comms.LeftJoystickDown  = false;
-  comms.RightJoystickUp   = false;
-  comms.RightJoystickDown = false;
+  // comms.Input4Active is deactivated with the z key
 }
 
 void updateButton(ButtonColor button) {
@@ -125,11 +143,22 @@ void updateCrankSpeed(unsigned s) {
   comms.InputCrankSpeed = s / 3.0;
 }
 
-void updateJoystick(int l, int r) {
-  comms.Input4Active = true;
-  comms.LeftJoystickUp    = (l == 1);
-  comms.LeftJoystickDown  = (l == -1);
-  comms.RightJoystickUp   = (r == 1);
-  comms.RightJoystickDown = (r == -1);
+void updateHandLR(int pos) {
+  comms.HoverPositionLR = (uint8_t)(pos * 255 / 8.0);
 }
 
+void updateHandUD(int pos) {
+  comms.Input4Active = (pos > 0);
+  comms.HoverPositionUD = (uint8_t)(pos * 255 / 8.0);
+}
+
+void updateLimit(LimitSwitch limit) {
+  switch (limit) {
+    case LIMIT_LEFT:
+      comms.BallDropperLeftLimit = !comms.BallDropperLeftLimit;
+      break;
+    case LIMIT_RIGHT:
+      comms.BallDropperRightLimit = !comms.BallDropperRightLimit;
+      break;
+  }
+}

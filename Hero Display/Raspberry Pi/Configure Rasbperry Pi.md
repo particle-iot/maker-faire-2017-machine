@@ -24,6 +24,8 @@ Copy you SSH key to the Pi `ssh-copy-id pi@raspberrypi.local`
 
 Log in to the Pi remotely `ssh pi@raspberrypi.local`
 
+Edit `/boot/cmdline.txt` and add `usbhid.mousepoll=0` to fix the laggy mouse in the GUI.
+
 Run `sudo raspi-config`
 
 - Change the password to the same password as the Maker Faire 2017 Particle user.
@@ -67,9 +69,39 @@ bash <( curl -sL https://particle.io/install-pi )
 
 Log in with software+mf2017@particle.io
 
-### Install web server
+Call the device `hero`
+
+### Setup web server
 
 ```
 sudo apt install nginx
+```
+
+Edit `/etc/nginx/sites-available/default` to:
+```
+root /home/pi/website
+```
+
+```
+sudo service nginx restart
+```
+
+### Flash firmware
+
+```
+make compile
+# outputs firmware.bin
+```
+
+Copy firmware to Pi
+```
+scp firmware.bin pi@hero.lan:
+```
+
+Replace firmware (local OTA...)
+```
+ssh pi@hero.lan
+sudo cp firmware.bin /var/lib/particle/devices/7ab72efbc4b6719da784073f/output.bin
+particle-agent restart
 ```
 

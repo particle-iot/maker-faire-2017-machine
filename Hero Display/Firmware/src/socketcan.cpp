@@ -10,7 +10,7 @@
 #include <sys/ioctl.h>
 #include <linux/can.h>
 
-SocketCAN::SocketCAN(const char *networkInterface)
+SocketCAN::SocketCAN(const char* networkInterface)
   : networkInterface(networkInterface)
 {
 }
@@ -29,40 +29,40 @@ void SocketCAN::bringCANInterfaceUp(unsigned long baudRate) {
 }
 
 void SocketCAN::openSocket() {
-	// open socket
-	if ((sock = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {
-		perror("socket");
-		return;
-	}
+  // open socket
+  if ((sock = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {
+    perror("socket");
+    return;
+  }
 
-    // convert can0 to network interface index
-	struct ifreq ifr;
-	strncpy(ifr.ifr_name, networkInterface, IFNAMSIZ - 1);
+  // convert can0 to network interface index
+  struct ifreq ifr;
+  strncpy(ifr.ifr_name, networkInterface, IFNAMSIZ - 1);
 
-	ifr.ifr_name[IFNAMSIZ - 1] = '\0';
-	ifr.ifr_ifindex = if_nametoindex(ifr.ifr_name);
-    if (!ifr.ifr_ifindex) {
-		perror("if_nametoindex");
-        sock = -1;
-		return;
-	}
+  ifr.ifr_name[IFNAMSIZ - 1] = '\0';
+  ifr.ifr_ifindex = if_nametoindex(ifr.ifr_name);
+  if (!ifr.ifr_ifindex) {
+    perror("if_nametoindex");
+    sock = -1;
+    return;
+  }
 
-    // set socket to non-blocking
-    fcntl(sock, F_SETFL, fcntl(sock, F_GETFL, 0) | O_NONBLOCK);
-    
-    // bind socket to the network interface
-	struct sockaddr_can addr;
-	addr.can_family = AF_CAN;
-	addr.can_ifindex = ifr.ifr_ifindex;
+  // set socket to non-blocking
+  fcntl(sock, F_SETFL, fcntl(sock, F_GETFL, 0) | O_NONBLOCK);
 
-	if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-		perror("bind");
-        sock = -1;
-		return;
-	}
+  // bind socket to the network interface
+  struct sockaddr_can addr;
+  addr.can_family = AF_CAN;
+  addr.can_ifindex = ifr.ifr_ifindex;
+
+  if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+    perror("bind");
+    sock = -1;
+    return;
+  }
 }
 
-bool SocketCAN::receive(CANMessage &message)
+bool SocketCAN::receive(CANMessage& message)
 {
   if (sock < 0) {
     return false;
@@ -71,18 +71,14 @@ bool SocketCAN::receive(CANMessage &message)
   
   if (read(sock, &frame, sizeof(frame)) > 0) {
     message = messageLinuxToParticle(frame);
-    Serial.printf("Received %02x ", message.id);
-    for (int i = 0; i < message.len; i++) {
-      Serial.printf("%02x", message.data[i]);
-    }
-    Serial.println("");
+    // debugPrintMessage(message);
     return true;
   }
 
   return false;
 }
 
-bool SocketCAN::transmit(const CANMessage &message)
+bool SocketCAN::transmit(const CANMessage& message)
 {
   if (sock < 0) {
     return false;
@@ -105,7 +101,7 @@ can_frame SocketCAN::messageParticleToLinux(const CANMessage &message)
   return frame;
 }
 
-CANMessage SocketCAN::messageLinuxToParticle(const can_frame &frame)
+CANMessage SocketCAN::messageLinuxToParticle(const can_frame& frame)
 {
   CANMessage message;
   message.id = frame.can_id;
@@ -116,7 +112,16 @@ CANMessage SocketCAN::messageLinuxToParticle(const can_frame &frame)
   return message;
 }
 
-void SocketCAN::perror(const char *message)
+void SocketCAN::debugPrintMessage(const CANMessage& message)
+{
+  Serial.printf("Received %02x ", message.id);
+  for (int i = 0; i < message.len; i++) {
+    Serial.printf("%02x", message.data[i]);
+  }
+  Serial.println("");
+}
+
+void SocketCAN::perror(const char* message)
 {
   fprintf(stderr, "%s\n", message);
 }
