@@ -6,10 +6,7 @@
 #include "socketcan.h"
 #include <stdio.h>
 
-// System threading is not stable yet on the Pi. It appears to deadlock,
-// so use manual mode instead
-//SYSTEM_THREAD(ENABLED);
-SYSTEM_MODE(MANUAL);
+SYSTEM_THREAD(ENABLED);
 
 /*
  * Pin config
@@ -72,7 +69,7 @@ void transmitComms() {
  * Make CAN data available to JSON every 100ms
  */
 
-const auto dataFile = "/home/pi/website/data.json";
+const auto dataFile = "/home/pi/can_signals.json";
 #define JSON_SIGNAL_INT(name) fprintf(file, "  \"%s\": %d,\n", #name, comms.name)
 #define JSON_SIGNAL_FLOAT(name) fprintf(file, "  \"%s\": %f,\n", #name, comms.name)
 

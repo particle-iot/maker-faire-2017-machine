@@ -36,6 +36,7 @@ void loop() {
       case ',': updateButton(BUTTON_RED); break;
       case '.': updateButton(BUTTON_GREEN); break;
       case '/': updateButton(BUTTON_BLUE); break;
+      case '+': updateBallCount1(1); break;
 
       case 'q': updateHue(0); break;
       case 'w': updateHue(1); break;
@@ -98,6 +99,7 @@ void printHelp() {
     "Type one of these characters to simulate interaction with a panel\r\n"
     "\r\n"
     "Panel 1: , for red, . for green, / for blue\r\n"
+    "         + to increase ball count\r\n"
     "Panel 2: q to p for hue\r\n"
     "Panel 3: 0 to 9 for input crank speed\r\n"
     "Panel 4: a to l for hand left/right, z to m for hand up/down,\r\n"
@@ -131,6 +133,10 @@ void updateButton(ButtonColor button) {
       comms.BlueButtonPressed = true;
       break;
   }
+}
+
+void updateBallCount1(int delta) {
+  comms.BallCount1 += delta;
 }
 
 void updateHue(unsigned h) {

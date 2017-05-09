@@ -105,3 +105,40 @@ sudo cp firmware.bin /var/lib/particle/devices/7ab72efbc4b6719da784073f/output.b
 particle-agent restart
 ```
 
+### Start browser on boot
+
+Set the browser home page to http://localhost
+
+Install mouse cursor hiding package
+```
+sudo apt install unclutter
+```
+
+Edit `~/.config/lxsession/LXDE-pi/autostart`
+
+Add
+```
+#Disable screensaver:
+@xset s noblank
+@xset s off
+@xset -dpms
+#Start browser on boot
+@chromium-browser --app=http://localhost --start-fullscreen
+#Hide mouse pointer
+@unclutter -idle 1 -root
+```
+
+### Download animation
+
+Generate an ssh key on the Pi
+```
+ssh-keygen
+```
+
+Add the `~/.ssh/id_rsa.pub` to the [Maker Faire Machine repo](https://github.com/spark/maker-faire-2017-machine/settings/keys) with read/write permissions.
+
+Clone the repo to the Pi
+```
+git clone git@github.com:spark/maker-faire-2017-machine.git
+```
+
