@@ -3,7 +3,7 @@
 ## Parts
 
 - Bracket (designed with Fusion 360) http://a360.co/2oVDeuF
-- Round bracket (designed with Fusion 360) http://a360.co/2qUFsPa
+- Round bracket (designed with Fusion 360) http://a360.co/2q6rvfz
 - Laser Diode https://www.amazon.com/gp/product/B01ITK4PEO
 - Photoresistor https://www.amazon.com/gp/product/B016D737Y4
 
