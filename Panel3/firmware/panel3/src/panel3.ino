@@ -25,14 +25,18 @@ bool runMachine = AUTO_START;
 
 const auto LASER_ENABLE_PIN = D0;
 const auto CAN_BUS_PINS = CAN_D1_D2;
-const auto INPUT_CRANK_ENCODER_A_PIN = D3;
-const auto INPUT_CRANK_ENCODER_B_PIN = D4;
-const auto BALL_WHEEL_ENCODER_A_PIN = D5;
-const auto BALL_WHEEL_ENCODER_B_PIN = D6;
+const auto INPUT_CRANK_ENCODER_B_PIN = D3;
+const auto INPUT_CRANK_ENCODER_A_PIN = D4;
+const auto BALL_WHEEL_ENCODER_B_PIN = D5;
+const auto BALL_WHEEL_ENCODER_A_PIN = D6;
+const auto SERVO_ENABLE_PIN = A0;
 const auto BALL_DETECTOR_1_PIN = A1;
 const auto BALL_DETECTOR_2_PIN = A2;
-const auto BALL_WHEEL_KILL_SWITCH_PIN = A5;
+const auto BALL_WHEEL_KILL_SWITCH_PIN = A3;
+const auto SERVO_1_PIN = A4;
+const auto SERVO_2_PIN = A5;
 const auto BALL_WHEEL_MOTOR_SPEED_PIN = DAC;
+const auto BALL_DETECTOR_3_PIN = WKP;
 
 /*
  * CAN communication
@@ -55,13 +59,23 @@ Encoder wheelEncoder(BALL_WHEEL_ENCODER_A_PIN, BALL_WHEEL_ENCODER_B_PIN);
  */
 BeamDetector detector1(BALL_DETECTOR_1_PIN, LASER_ENABLE_PIN);
 BeamDetector detector2(BALL_DETECTOR_2_PIN, LASER_ENABLE_PIN);
+BeamDetector detector3(BALL_DETECTOR_3_PIN, LASER_ENABLE_PIN);
+
+/*
+ * Servos
+ */
+
+Servo servo1;
+Servo servo2;
 
 /*
  * Config stored in EEPROM
  */
 struct Config {
   uint32_t app;
-  uint32_t ballCount;
+  uint32_t ballCount1;
+  uint32_t ballCount2;
+  uint32_t ballCount3;
   uint16_t inputCrankPulsesPerRevolution;
   float ballWheelSpeedFactor;
   uint16_t ballWheelMinSpeed;
@@ -69,9 +83,14 @@ struct Config {
 } config;
 
 Config defaultConfig = {
-  /* app */ APP_CODE('M', 'F', '3', 0), // increment last digit to reset EEPROM on boot
-  /* ballCount */ 0,
+  /* app */ APP_CODE('M', 'F', '3', 2), // increment last digit to reset EEPROM on boot
+  /* ballCount1 */ 0,
+  /* ballCount2 */ 0,
+  /* ballCount3 */ 0,
   /* inputCrankPulsesPerRevolution */ 600,
+  /* ballWheelSpeedFactor */ 600.0,
+  /* ballWheelMinSpeed */ 200,
+  /* ballWheelMaxSpeed */ 4000,
 };
 
 Storage<Config> storage(defaultConfig);
@@ -86,6 +105,7 @@ void setup() {
   setupComms();
   setupDetectors();
   setupMotor();
+  setupServos();
 }
 
 /*
@@ -98,6 +118,7 @@ void loop() {
   updateDetectors();
   readInputCrank();
   controlMotor();
+  controlServos();
   printStatus();
   transmitComms();
   storeBallCount();
@@ -109,29 +130,52 @@ void loop() {
 
 bool beamBroken1 = false;
 bool beamBroken2 = false;
-uint32_t ballCount = 0;
+bool beamBroken3 = false;
+uint32_t ballCount1 = 0;
+uint32_t ballCount2 = 0;
+uint32_t ballCount3 = 0;
 
 void setupDetectors() {
   detector1.begin(BeamDetector::POWER_OFF);
   detector2.begin(BeamDetector::POWER_OFF);
+  detector3.begin(BeamDetector::POWER_OFF);
 
-  // restore ballCount from storage
-  ballCount = config.ballCount;
+  // restore ballCounts from storage
+  ballCount1 = config.ballCount1;
+  ballCount2 = config.ballCount2;
+  ballCount3 = config.ballCount3;
 }
 
 void updateDetectors() {
   detector1.enable(runMachine);
   detector2.enable(runMachine);
+  detector3.enable(runMachine);
 
   beamBroken1 = detector1.beamBroken();
   beamBroken2 = detector2.beamBroken();
+  beamBroken3 = detector3.beamBroken();
 
-  // Count balls using detector 1 only
-  static uint32_t oldDetectionCount = 0;
-  uint32_t detectionCount = detector1.detectionCount();
-  if (detectionCount != oldDetectionCount) {
-    ballCount += detectionCount - oldDetectionCount;
+  // Count balls
+  static uint32_t oldDetectionCount1 = 0;
+  uint32_t detectionCount1 = detector1.detectionCount();
+  if (detectionCount1 != oldDetectionCount1) {
+    ballCount1 += detectionCount1 - oldDetectionCount1;
   }
+  oldDetectionCount1 = detectionCount1;
+
+  static uint32_t oldDetectionCount2 = 0;
+  uint32_t detectionCount2 = detector2.detectionCount();
+  if (detectionCount2 != oldDetectionCount2) {
+    ballCount2 += detectionCount2 - oldDetectionCount2;
+  }
+  oldDetectionCount2 = detectionCount2;
+
+  static uint32_t oldDetectionCount3 = 0;
+  uint32_t detectionCount3 = detector3.detectionCount();
+  if (detectionCount3 != oldDetectionCount3) {
+    ballCount3 += detectionCount3 - oldDetectionCount3;
+  }
+  oldDetectionCount3 = detectionCount3;
 }
 
 /*
@@ -153,6 +197,7 @@ void readInputCrank() {
 
   long position = inputEncoder.read();
   long deltaPosition = position - lastInputCrankPosition;
+  lastInputCrankPosition = position;
 
   /* Convert pulses since the last interval to speed
    * speed_revolution_per_second = (pulses / pulses_per_revolution) / interval_ms * 1000 * ms_per_second
@@ -166,6 +211,7 @@ void readInputCrank() {
   } else {
     inputCrankSpeed = 0;
   }
+  //Serial.printlnf("pos=%d delta=%d speed=%f", position, deltaPosition, inputCrankSpeed);
 }
 
 void updateInputCrankFactor() {
@@ -179,11 +225,14 @@ void updateInputCrankFactor() {
 const auto MOTOR_RUN = LOW;
 const auto MOTOR_KILL = HIGH;
 
+// turn stall detection off during development if the wheel encoder is not connected
+const auto ENABLE_STALL_DETECTION = true;
+
 auto motorState = AUTO_START ? MOTOR_RUN : MOTOR_KILL;
 uint32_t motorSpeed = 0;
 
 uint32_t motorControlLastUpdate = 0;
-const auto motorControlkInterval = 100;
+const auto motorControlInterval = 100;
 const auto motorStallMaxTime = 1000;
 long motorPosition = 0;
 long oldMotorPosition = 0;
@@ -204,7 +253,7 @@ void controlMotor() {
 
   // Scale input crank speed to a voltage in the 0-3.3V range to send to
   // the motor controller
-  auto maxSpeed = max(config.ballWheelMaxSpeed, 4095);
+  uint16_t maxSpeed = min(config.ballWheelMaxSpeed, 4095);
   motorSpeed = (uint32_t)(inputCrankSpeed * config.ballWheelSpeedFactor) + config.ballWheelMinSpeed;
 
   if (motorSpeed > maxSpeed) {
@@ -216,7 +265,7 @@ void controlMotor() {
   // Safety setting of the motor
   // if the desired motor speed > 0 and there were no pulses on the encoder for 1 second,
   // trigger the motor controller kill switch until the machine start button is pressed again
-  if (inputCrankSpeed > 0) {
+  if (ENABLE_STALL_DETECTION && inputCrankSpeed > 0) {
     if (motorPosition == oldMotorPosition) {
       motorStallCounter++;
     }
@@ -239,6 +288,31 @@ void controlMotor() {
 
   digitalWrite(BALL_WHEEL_KILL_SWITCH_PIN, motorState);
   analogWrite(BALL_WHEEL_MOTOR_SPEED_PIN, runMachine ? motorSpeed : 0);
+}
+
+/*
+ * Servos
+ */
+
+uint8_t servo1Pos = 0;
+uint8_t servo2Pos = 0;
+
+const auto SERVO_RUN = LOW;
+const auto SERVO_KILL = HIGH;
+
+void setupServos() {
+  servo1.attach(SERVO_1_PIN);
+  servo2.attach(SERVO_2_PIN);
+  pinMode(SERVO_ENABLE_PIN, OUTPUT);
+  digitalWrite(SERVO_ENABLE_PIN, SERVO_KILL);
+}
+
+void controlServos() {
+  // TODO: set servo1Pos and servo2Pos
+
+  digitalWrite(SERVO_ENABLE_PIN, runMachine ? SERVO_RUN : SERVO_KILL);
+  servo1.write(servo1Pos);
+  servo2.write(servo2Pos);
 }
 
 /*
@@ -273,16 +347,24 @@ uint32_t printLastUpdate = 0;
 const auto printInterval = 100;
 
 void printStatus() {
-  if (millis() - printLastUpdate < printInterval) {
+  auto now = millis();
+  if (now - printLastUpdate < printInterval) {
     return;
   }
+  printLastUpdate = now;
 
   Serial.printlnf(
-    "input=%f d1=%d d2=%d balls=%d",
+    "crank=%f motor=%d/%d stall=%d beams=%d/%d/%d balls=%d/%d/%d",
     inputCrankSpeed,
+    motorSpeed,
+    motorState,
+    motorStallCounter,
     beamBroken1,
     beamBroken2,
-    ballCount
+    beamBroken3,
+    ballCount1,
+    ballCount2,
+    ballCount3
   );
 }
 
@@ -306,13 +388,25 @@ int setConfigFromCloud(String arg) {
     String name = arg.substring(0, equalPos);
     String value = arg.substring(equalPos + 1);
 
-    if (name.equals("ballCount")) {
-      config.ballCount = value.toInt();
-      ballCount = config.ballCount;
+    if (name.equals("ballCount1")) {
+      config.ballCount1 = value.toInt();
+      ballCount1 = config.ballCount1;
+    } else if (name.equals("ballCount2")) {
+      config.ballCount2 = value.toInt();
+      ballCount2 = config.ballCount2;
+    } else if (name.equals("ballCount3")) {
+      config.ballCount3 = value.toInt();
+      ballCount3 = config.ballCount3;
     } else if (name.equals("inputCrankPulsesPerRevolution")) {
       config.inputCrankPulsesPerRevolution = value.toInt();
       // recompute cached factor
       updateInputCrankFactor();
+    } else if (name.equals("ballWheelSpeedFactor")) {
+      config.ballWheelSpeedFactor = value.toFloat();
+    } else if (name.equals("ballWheelMinSpeed")) {
+      config.ballWheelMinSpeed = value.toInt();
+    } else if (name.equals("ballWheelMaxSpeed")) {
+      config.ballWheelMaxSpeed = value.toInt();
     } else {
       return -2;
     }
@@ -331,9 +425,17 @@ void loadStorage() {
 
 // Write ball count to EEPROM every N balls
 void storeBallCount() {
-  static const auto STORE_BALLS_DELTA = 100;
-  if (ballCount - config.ballCount > STORE_BALLS_DELTA) {
-    config.ballCount = ballCount;
+  static const auto STORE_BALLS_DELTA = 20;
+  if (ballCount1 - config.ballCount1 >= STORE_BALLS_DELTA) {
+    config.ballCount1 = ballCount1;
+    storage.store(config);
+  }
+  if (ballCount2 - config.ballCount2 >= STORE_BALLS_DELTA) {
+    config.ballCount2 = ballCount2;
+    storage.store(config);
+  }
+  if (ballCount3 - config.ballCount3 >= STORE_BALLS_DELTA) {
+    config.ballCount3 = ballCount3;
     storage.store(config);
   }
 }

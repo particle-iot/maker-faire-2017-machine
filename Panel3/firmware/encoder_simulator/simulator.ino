@@ -2,7 +2,7 @@ SYSTEM_MODE(MANUAL);
 
 const auto encoderA = A0;
 const auto encoderB = A1;
-const auto pulseInterval = 50;
+const auto pulseInterval = 100;
 
 void setup() {
   pinMode(D7, OUTPUT);
