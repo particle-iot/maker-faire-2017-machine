@@ -85,6 +85,7 @@ void loop() {
   }
 
   comms.receive();
+  displayStartStop();
   comms.transmit(MachineModules::Panel1);
   comms.transmit(MachineModules::Panel2);
   comms.transmit(MachineModules::Panel3);
@@ -105,6 +106,19 @@ void printHelp() {
     "Panel 4: a to l for hand left/right, z to m for hand up/down,\r\n"
     "         ; and ' for limit switches\r\n"
   );
+}
+
+void displayStartStop() {
+  static bool start = false;
+  static bool stop = false;
+  if (comms.MachineStart && !start) {
+    Serial.println("START!");
+  }
+  if (comms.MachineStop && !stop) {
+    Serial.println("STOP!");
+  }
+  start = comms.MachineStart;
+  stop = comms.MachineStop;
 }
 
 void clearInput() {
