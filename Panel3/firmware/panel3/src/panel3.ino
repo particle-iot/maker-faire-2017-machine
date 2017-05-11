@@ -77,20 +77,32 @@ struct Config {
   uint32_t ballCount2;
   uint32_t ballCount3;
   uint16_t inputCrankPulsesPerRevolution;
+  uint16_t inputCrankInterval;
   float ballWheelSpeedFactor;
   uint16_t ballWheelMinSpeed;
   uint16_t ballWheelMaxSpeed;
+  uint16_t wheelPulsesPerBall;
+  uint8_t servo1OpenPos;
+  uint8_t servo1ClosedPos;
+  uint8_t servo2OpenPos;
+  uint8_t servo2ClosedPos;
 } config;
 
 Config defaultConfig = {
-  /* app */ APP_CODE('M', 'F', '3', 2), // increment last digit to reset EEPROM on boot
+  /* app */ APP_CODE('M', 'F', '3', 3), // increment last digit to reset EEPROM on boot
   /* ballCount1 */ 0,
   /* ballCount2 */ 0,
   /* ballCount3 */ 0,
   /* inputCrankPulsesPerRevolution */ 600,
+  /* inputCrankInterval */ 100,
   /* ballWheelSpeedFactor */ 600.0,
   /* ballWheelMinSpeed */ 200,
   /* ballWheelMaxSpeed */ 4000,
+  /* wheelPulsesPerBall */ 40,
+  /* servo1OpenPos */ 20,
+  /* servo1ClosedPos */ 160,
+  /* servo2OpenPos */ 20,
+  /* servo2ClosedPos */ 160,
 };
 
 Storage<Config> storage(defaultConfig);
@@ -183,14 +195,13 @@ void updateDetectors() {
  */
 
 uint32_t inputCrankLastUpdate = 0;
-const auto inputCrankInterval = 100;
 long lastInputCrankPosition = 0;
 float inputCrankSpeed = 0;
 float inputCrankFactor = 0;
 
 void readInputCrank() {
   auto now = millis();
-  if (now - inputCrankLastUpdate < inputCrankInterval) {
+  if (now - inputCrankLastUpdate < config.inputCrankInterval) {
     return;
   }
   inputCrankLastUpdate = now;
@@ -215,7 +226,7 @@ void readInputCrank() {
 }
 
 void updateInputCrankFactor() {
-  inputCrankFactor = 1000.0 / (config.inputCrankPulsesPerRevolution * inputCrankInterval);
+  inputCrankFactor = 1000.0 / (config.inputCrankPulsesPerRevolution * config.inputCrankInterval);
 }
 
 /*
@@ -234,8 +245,8 @@ uint32_t motorSpeed = 0;
 uint32_t motorControlLastUpdate = 0;
 const auto motorControlInterval = 100;
 const auto motorStallMaxTime = 1000;
-long motorPosition = 0;
-long oldMotorPosition = 0;
+long wheelPosition = 0;
+long oldWheelPosition = 0;
 uint16_t motorStallCounter = 0;
 
 void setupMotor() {
@@ -260,13 +271,13 @@ void controlMotor() {
     motorSpeed = maxSpeed;
   }
 
-  motorPosition = wheelEncoder.read();
+  wheelPosition = wheelEncoder.read();
 
   // Safety setting of the motor
   // if the desired motor speed > 0 and there were no pulses on the encoder for 1 second,
   // trigger the motor controller kill switch until the machine start button is pressed again
   if (ENABLE_STALL_DETECTION && inputCrankSpeed > 0) {
-    if (motorPosition == oldMotorPosition) {
+    if (wheelPosition == oldWheelPosition) {
       motorStallCounter++;
     }
   } else {
@@ -284,7 +295,7 @@ void controlMotor() {
     motorState = MOTOR_KILL;
   }
 
-  oldMotorPosition = motorPosition;
+  oldWheelPosition = wheelPosition;
 
   digitalWrite(BALL_WHEEL_KILL_SWITCH_PIN, motorState);
   analogWrite(BALL_WHEEL_MOTOR_SPEED_PIN, runMachine ? motorSpeed : 0);
@@ -294,11 +305,17 @@ void controlMotor() {
  * Servos
  */
 
+const auto SERVO_RUN = LOW;
+const auto SERVO_KILL = HIGH;
+
 uint8_t servo1Pos = 0;
 uint8_t servo2Pos = 0;
 
-const auto SERVO_RUN = LOW;
-const auto SERVO_KILL = HIGH;
+enum {
+  DOORS_CLOSED,
+  DOOR1_OPEN,
+  DOOR2_OPEN,
+} doorState = DOORS_CLOSED;
 
 void setupServos() {
   servo1.attach(SERVO_1_PIN);
@@ -308,11 +325,26 @@ void setupServos() {
 }
 
 void controlServos() {
-  // TODO: set servo1Pos and servo2Pos
+  // Change the servo position for every ball by counting the number of
+  // pulses on the ball wheel
+  switch (doorState) {
+    case DOOR1_OPEN:
+      servo1Pos = config.servo1OpenPos;
+      servo2Pos = config.servo2ClosedPos;
+      break;
+    case DOOR2_OPEN:
+      servo1Pos = config.servo1ClosedPos;
+      servo2Pos = config.servo2OpenPos;
+      break;
+    default:
+      servo1Pos = config.servo1ClosedPos;
+      servo2Pos = config.servo2ClosedPos;
+      break;
+  }
 
-  digitalWrite(SERVO_ENABLE_PIN, runMachine ? SERVO_RUN : SERVO_KILL);
   servo1.write(servo1Pos);
   servo2.write(servo2Pos);
+  digitalWrite(SERVO_ENABLE_PIN, runMachine ? SERVO_RUN : SERVO_KILL);
 }
 
 /*
@@ -354,8 +386,9 @@ void printStatus() {
   printLastUpdate = now;
 
   Serial.printlnf(
-    "crank=%f motor=%d/%d stall=%d beams=%d/%d/%d balls=%d/%d/%d",
+    "crank=%f wheel=%d motor=%d/%d stall=%d beams=%d/%d/%d balls=%d/%d/%d",
     inputCrankSpeed,
+    wheelPosition,
     motorSpeed,
     motorState,
     motorStallCounter,
@@ -376,6 +409,7 @@ void registerCloud() {
   if (!registered && Particle.connected()) {
     registered = true;
     Particle.function("set", setConfigFromCloud);
+    Particle.function("door", changeDoorState);
   }
 }
 
@@ -401,18 +435,37 @@ int setConfigFromCloud(String arg) {
       config.inputCrankPulsesPerRevolution = value.toInt();
       // recompute cached factor
       updateInputCrankFactor();
+    } else if (name.equals("inputCrankInterval")) {
+      config.inputCrankInterval = value.toInt();
+      // recompute cached factor
+      updateInputCrankFactor();
     } else if (name.equals("ballWheelSpeedFactor")) {
       config.ballWheelSpeedFactor = value.toFloat();
     } else if (name.equals("ballWheelMinSpeed")) {
       config.ballWheelMinSpeed = value.toInt();
     } else if (name.equals("ballWheelMaxSpeed")) {
       config.ballWheelMaxSpeed = value.toInt();
+    } else if (name.equals("wheelPulsesPerBall")) {
+      config.wheelPulsesPerBall = value.toInt();
+    } else if (name.equals("servo1OpenPos")) {
+      config.servo1OpenPos = value.toInt();
+    } else if (name.equals("servo1ClosedPos")) {
+      config.servo1ClosedPos = value.toInt();
+    } else if (name.equals("servo2OpenPos")) {
+      config.servo2OpenPos = value.toInt();
+    } else if (name.equals("servo2ClosedPos")) {
+      config.servo2ClosedPos = value.toInt();
     } else {
       return -2;
     }
 
     storage.store(config);
     return 0;
+}
+
+int changeDoorState(String arg) {
+  doorState = arg.toInt();
+  return 0;
 }
 
 /*
