@@ -14,7 +14,6 @@ using namespace std;
 //#define MINI_MODE
 
 SYSTEM_THREAD(ENABLED);
-SYSTEM_MODE(MANAL);
 
 BuiltinCAN can(CAN_D1_D2);
 Communication comms(can);
@@ -435,18 +434,8 @@ void updatePanel4() {
 
   // Change left and right hue depending on the joysticks.
   // Linearly interpolate between the 2 hues
-  if (comms.LeftJoystickUp) {
-    leftHue++;
-  }
-  if (comms.LeftJoystickDown) {
-    leftHue--;
-  }
-  if (comms.RightJoystickUp) {
-    rightHue++;
-  }
-  if (comms.RightJoystickDown) {
-    rightHue--;
-  }
+  leftHue = comms.HoverPositionLR;
+  rightHue = comms.HoverPositionUD;
 
   unsigned first = config.panelFirst[PANEL4];
   unsigned size = config.panelSize[PANEL4];
@@ -497,6 +486,7 @@ void display() {
       displayAttract(panel);
     }
   }
+  strip.show();
   strip.show();
 }
 
