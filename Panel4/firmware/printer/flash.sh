@@ -1,0 +1,1 @@
+particle flash 40002d000e47343233323032 firmware.bin
