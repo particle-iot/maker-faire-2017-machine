@@ -82,7 +82,8 @@ struct Config {
   uint16_t ballWheelMinSpeed;
   uint16_t ballWheelMaxSpeed;
   uint8_t ballWheelStallDetection;
-  uint16_t wheelPulsesPerBall;
+  uint8_t autoDoors;
+  float wheelPulsesPerBall;
   uint8_t servo1OpenPos;
   uint8_t servo1ClosedPos;
   uint8_t servo2OpenPos;
@@ -90,7 +91,7 @@ struct Config {
 } config;
 
 Config defaultConfig = {
-  /* app */ APP_CODE('M', 'F', '3', 4), // increment last digit to reset EEPROM on boot
+  /* app */ APP_CODE('M', 'F', '3', 7), // increment last digit to reset EEPROM on boot
   /* ballCount1 */ 0,
   /* ballCount2 */ 0,
   /* ballCount3 */ 0,
@@ -99,12 +100,13 @@ Config defaultConfig = {
   /* ballWheelSpeedFactor */ 600.0,
   /* ballWheelMinSpeed */ 200,
   /* ballWheelMaxSpeed */ 4000,
-  /* ballWheelStallDetection */ 1,
-  /* wheelPulsesPerBall */ 40,
-  /* servo1OpenPos */ 20,
-  /* servo1ClosedPos */ 160,
-  /* servo2OpenPos */ 20,
-  /* servo2ClosedPos */ 160,
+  /* ballWheelStallDetection */ 0,
+  /* autoDoors */ 1,
+  /* wheelPulsesPerBall */ 2400 / 36.0,
+  /* servo1OpenPos */ 69,
+  /* servo1ClosedPos */ 99,
+  /* servo2OpenPos */ 65,
+  /* servo2ClosedPos */ 95,
 };
 
 Storage<Config> storage(defaultConfig);
@@ -314,16 +316,23 @@ void controlMotor() {
  * Servos
  */
 
-const auto SERVO_RUN = LOW;
-const auto SERVO_KILL = HIGH;
+const auto SERVO_RUN = HIGH;
+const auto SERVO_KILL = LOW;
 
 uint8_t servo1Pos = 0;
 uint8_t servo2Pos = 0;
+
+uint32_t servoControlLastUpdate = 0;
+const auto servoControlInterval = 100;
+
+uint32_t servoActuations = 0;
+uint32_t lastServoActuations = 0;
 
 enum DoorState_e {
   DOORS_CLOSED,
   DOOR1_OPEN,
   DOOR2_OPEN,
+  DOOR_STATE_MAX
 } doorState = DOORS_CLOSED;
 
 void setupServos() {
@@ -334,8 +343,23 @@ void setupServos() {
 }
 
 void controlServos() {
-  // Change the servo position for every ball by counting the number of
-  // pulses on the ball wheel
+  auto now = millis();
+  if (now - servoControlLastUpdate < servoControlInterval) {
+    return;
+  }
+  servoControlLastUpdate = now;
+
+  if (config.autoDoors) {
+    // Change the servo position for every ball by counting the number of
+    // pulses on the ball wheel
+    servoActuations = (uint32_t)(wheelPosition / config.wheelPulsesPerBall);
+    if (servoActuations != lastServoActuations) {
+      // Pick a new door
+      doorState = (DoorState_e)(random(DOOR_STATE_MAX));
+    }
+    lastServoActuations = servoActuations;
+  }
+
   switch (doorState) {
     case DOOR1_OPEN:
       servo1Pos = config.servo1OpenPos;
@@ -377,6 +401,10 @@ void transmitComms() {
   comms.Input3Active = (inputCrankSpeed > 0);
   comms.InputCrankSpeed = inputCrankSpeed;
 
+  comms.IntegrationCountA = ballCount1;
+  comms.IntegrationCountB = ballCount2;
+  comms.IntegrationCountC = ballCount3;
+
   comms.transmit(MachineModules::Panel3);
 }
 
@@ -395,13 +423,17 @@ void printStatus() {
   printLastUpdate = now;
 
   Serial.printlnf(
-    "crank=%d speed=%f wheel=%d motor=%d/%d stall=%d beams=%d/%d/%d balls=%d/%d/%d",
+    "%s crank=%d speed=%f wheel=%d motor=%d/%d stall=%d door=%d/%d/%d beams=%d/%d/%d balls=%d/%d/%d",
+    runMachine ? "RUN " : "KILL ",
     inputCrankPosition,
     inputCrankSpeed,
     wheelPosition,
     motorSpeed,
     motorState,
     motorStallCounter,
+    doorState,
+    servo1Pos,
+    servo2Pos,
     beamBroken1,
     beamBroken2,
     beamBroken3,
@@ -457,8 +489,10 @@ int setConfigFromCloud(String arg) {
       config.ballWheelMaxSpeed = value.toInt();
     } else if (name.equals("ballWheelStallDetection")) {
       config.ballWheelStallDetection = value.toInt();
+    } else if (name.equals("autoDoors")) {
+      config.autoDoors = value.toInt();
     } else if (name.equals("wheelPulsesPerBall")) {
-      config.wheelPulsesPerBall = value.toInt();
+      config.wheelPulsesPerBall = value.toFloat();
     } else if (name.equals("servo1OpenPos")) {
       config.servo1OpenPos = value.toInt();
     } else if (name.equals("servo1ClosedPos")) {
