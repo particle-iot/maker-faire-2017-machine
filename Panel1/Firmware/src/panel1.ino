@@ -23,16 +23,16 @@ bool runMachine = AUTO_START;
  */
 
 const auto CAN_BUS_PINS = CAN_D1_D2;
-const auto BALL_PUMP_PIN = D3;
-const auto HOPPER_PIN = D4;
-const auto TURBINES_PIN = D5;
+const auto HOPPER_PIN = D3;
+const auto TURBINES_PIN = D4;
+const auto BALL_PUMP_PIN = D5;
 // D6 spare relay shield pin
 
-const auto BUTTON_RED_PIN = A0;
+const auto INPUT_BALL_DETECTOR_PIN = A0;
 const auto BALL_DETECTOR_1_PIN = A1;
 const auto BALL_DETECTOR_2_PIN = A2;
 const auto BALL_DETECTOR_3_PIN = A3;
-const auto INPUT_BALL_DETECTOR_PIN = A4;
+const auto BUTTON_RED_PIN = A4;
 const auto BUTTON_GREEN_PIN = A5;
 const auto BUTTON_BLUE_PIN = A6;
 const auto LASER_ENABLE_PIN = A7;
@@ -60,10 +60,11 @@ struct Config {
   uint16_t hopperStartDelay;
   uint16_t hopperStopDelay;
   uint16_t hopperMaxRunTime;
+  uint16_t waitTime;
 } config;
 
 Config defaultConfig = {
-  /* app */ APP_CODE('M', 'F', '1', 0), // increment last digit to reset EEPROM on boot
+  /* app */ APP_CODE('M', 'F', '1', 1), // increment last digit to reset EEPROM on boot
   /* ballCount1 */ 0,
   /* ballCount2 */ 0,
   /* ballCount3 */ 0,
@@ -75,6 +76,7 @@ Config defaultConfig = {
   /* hopperStartDelay */ 2000,
   /* hopperStopDelay */ 1000,
   /* hopperMaxRunTime */ 5000,
+  /* waitTime */ 2000,
 };
 
 Storage<Config> storage(defaultConfig);
@@ -107,6 +109,7 @@ void loop() {
   controlHopper();
   doPanelControl();
   controlBallPump();
+  controlTurbines();
   controlServos();
   printStatus();
   transmitComms();
@@ -222,7 +225,7 @@ void controlBallPump() {
 const auto TURBINES_RUN = HIGH;
 const auto TURBINES_STOP = LOW;
 
-bool spinTurbines = false;
+bool runTurbines = false;
 
 void setupTurbines() {
   pinMode(TURBINES_PIN, OUTPUT);
@@ -230,15 +233,15 @@ void setupTurbines() {
 }
 
 void controlTurbines() {
-  digitalWrite(TURBINES_PIN, runMachine && spinTurbines ? TURBINES_RUN : TURBINES_STOP);
+  digitalWrite(TURBINES_PIN, runMachine && runTurbines ? TURBINES_RUN : TURBINES_STOP);
 }
 
 /*
  * Ball hopper
  */
 
-const auto HOPPER_STOP = HIGH;
-const auto HOPPER_RUN = LOW;
+const auto HOPPER_STOP = LOW;
+const auto HOPPER_RUN = HIGH;
 
 bool runHopper = false;
 
@@ -345,10 +348,12 @@ enum PanelState_e {
   PANEL_IDLE,
   PANEL_SELECT_TRACK,
   PANEL_RUN_PUMP,
+  PANEL_WAIT,
 } panelState = PANEL_IDLE;
 
 uint32_t trackSelectStartTime = 0;
 uint32_t ballPumpStartTime = 0;
+uint32_t waitStartTime = 0;
 
 void doPanelControl() {
   auto now = millis();
@@ -358,15 +363,16 @@ void doPanelControl() {
       if (redButtonPressed || greenButtonPressed || blueButtonPressed) {
         panelState = PANEL_SELECT_TRACK;
         trackSelectStartTime = now;
-        if (redButtonPressed) {
+        if (blueButtonPressed) {
           trackSelectorState = TRACK_1;
-          spinTurbines = true;
-        } else if (greenButtonPressed) {
+          runTurbines = true;
+        } else if (redButtonPressed) {
           trackSelectorState = TRACK_2;
-        } else if (blueButtonPressed) {
+        } else if (greenButtonPressed) {
           trackSelectorState = TRACK_3;
         }
       }
+      break;
 
     case PANEL_SELECT_TRACK:
       if (now - trackSelectStartTime > config.trackSelectTime) {
@@ -378,17 +384,22 @@ void doPanelControl() {
 
     case PANEL_RUN_PUMP:
       if (now - ballPumpStartTime > config.ballPumpRunTime) {
-        panelState = PANEL_IDLE;
+        panelState = PANEL_WAIT;
         runBallPump = false;
+      }
+      break;
+
+    case PANEL_WAIT:
+      if (now - waitStartTime > config.waitTime) {
+        panelState = PANEL_IDLE;
       }
       break;
   }
 
-  if (spinTurbines && beamBroken1) {
-    spinTurbines = false;
+  if (runTurbines && beamBroken1) {
+    runTurbines = false;
   }
 }
-
 
 /*
  * CAN communication
@@ -436,7 +447,14 @@ void printStatus() {
   printLastUpdate = now;
 
   Serial.printlnf(
-    "servo=%d beams=%d/%d/%d/%d balls=%d/%d/%d",
+    "rgb=%d/%d/%d st=%d hop=%d pump=%d turb=%d servo=%d beams=%d/%d/%d/%d balls=%d/%d/%d",
+    redButtonPressed,
+    greenButtonPressed,
+    blueButtonPressed,
+    panelState,
+    runHopper,
+    runBallPump,
+    runTurbines,
     servoPos,
     beamBroken1,
     beamBroken2,
@@ -497,6 +515,8 @@ int setConfigFromCloud(String arg) {
       config.hopperStopDelay = value.toInt();
     } else if (name.equals("hopperMaxRunTime")) {
       config.hopperMaxRunTime = value.toInt();
+    } else if (name.equals("waitTime")) {
+      config.waitTime = value.toInt();
     } else {
       return -2;
     }
@@ -522,7 +542,7 @@ int overrideHopper(String arg) {
 }
 
 int overrideTurbines(String arg) {
-  spinTurbines = arg.toInt();
+  runTurbines = arg.toInt();
   return 0;
 }
 
