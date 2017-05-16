@@ -9,6 +9,10 @@
 #define BUMP_BTN_PIN1 A0
 #define BUMP_BTN_PIN2 A1
 
+//TODO: What are these really?
+#define BALL_PUMP_PIN D5
+#define BALLS_FULL_PIN D6
+
 #define STEPPER_DIRECTION_LEFT LOW
 #define STEPPER_DIRECTION_RIGHT HIGH
 
@@ -48,11 +52,13 @@ unsigned long lastHoverCommand = 0;
 unsigned long lastHoverCheck = 0;
 bool state = false;
 
+// TODO: how long should this run for?
+#define DISPENSE_BALL_DURATION 3000
+bool dispensingBall = false;
+unsigned long startedDispensingBallTime = 0;
 
 /*
     How to wire it up!
-
-
 
     Behaviors!
 
@@ -68,8 +74,6 @@ bool state = false;
         fire up the "ball pump pin when touched"
         fix the backoff / movement behavior Mohit added
         cleanup code a bit
-
-
 */
 
 
@@ -83,6 +87,9 @@ void setup() {
 
     pinMode(BUMP_BTN_PIN1, INPUT_PULLUP);
     pinMode(BUMP_BTN_PIN2, INPUT_PULLUP);
+
+    pinMode(BALL_PUMP_PIN, OUTPUT);
+    pinMode(BALLS_FULL_PIN, INPUT);
 
     pinMode(D7, OUTPUT);
 
@@ -99,7 +106,7 @@ void loop() {
     // bool blink_state = false;
     hoverTick();
 
-
+    dispenseBallTick();
 }
 
 void hoverTick() {
@@ -119,16 +126,14 @@ void hoverTick() {
 //            +----------------+
 
 
-
-
     // we want to update what we're doing every 50 milliseconds if we can, so it feels very responsive.
 
     // if we're in the "middle" don't move
     // if we haven't gotten an even in the last, uh, 100 milliseconds stop moving
     // if we've gotten new instructions since the last check, update.
 
-// unsigned long lastHoverCommand = 0;
-// unsigned long lastHoverCheck = 0;
+    // unsigned long lastHoverCommand = 0;
+    // unsigned long lastHoverCheck = 0;
 
     // only check every xx seconds
     unsigned long now = millis();
@@ -171,29 +176,46 @@ void hoverTick() {
         dir = "stop";
         controlMotor(MotorAction::STOP);
     }
+
     // TODO: slow vs. fast regions?
 
     Serial.println(String::format("(%d, %d, %d) direction %s ", p.x, p.y, p.z, dir));
 
-//    if (_isLeftBumpSwitchOn)
-//    {
-//        //digitalWrite(STEPPER_EN_PIN, LOW);      // Motor On
-//        controlMotor(MotorAction::RIGHT);
-//    }
-//    if (_isRightBumpSwitchOn)
-//    {
-//        //digitalWrite(STEPPER_EN_PIN, LOW);
-//        controlMotor(MotorAction::LEFT);
-//    }
+    Touch t = hover.getTouch();
+    if ( t.touchID != 0) {
+        //         Serial.print("Event: "); Serial.print(t.touchType); Serial.print("\t");
+        //         Serial.print("Touch ID: "); Serial.print(t.touchID,HEX); Serial.print("\t");
+        //         Serial.print("Value: "); Serial.print(t.touchValue,HEX); Serial.println("");
+        dispenseBall();
+    }
+}
 
+void dispenseBallTick() {
+    unsigned long now = millis();
 
-    // Touch t = hover.getTouch();
-    // if ( t.touchID != 0) {
-    //     Serial.print("Event: "); Serial.print(t.touchType); Serial.print("\t");
-    //     Serial.print("Touch ID: "); Serial.print(t.touchID,HEX); Serial.print("\t");
-    //     Serial.print("Value: "); Serial.print(t.touchValue,HEX); Serial.println("");
-    // }
+    if (dispensingBall) {
+        if ((now - startedDispensingBallTime) > DISPENSE_BALL_DURATION) {
+            dispensingBall = false;
+            // stop pumping
+            digitalWrite(BALL_PUMP_PIN, LOW);
+            Serial.println("done dispensing ball...");
+        }
+    }
+    else {
+        // putting this here so we don't chain dispense'es
+        if (digitalRead(BALLS_FULL_PIN) == HIGH) {
+            dispenseBall();
+        }
+    }
+}
 
+void dispenseBall() {
+    dispensingBall = true;
+    startedDispensingBallTime = millis();
+
+    // start pumping
+    digitalWrite(BALL_PUMP_PIN, HIGH);
+    Serial.println("Dispensing ball...");
 }
 
 /**
@@ -232,12 +254,6 @@ void controlMotor(MotorAction action) {
             _isMotorStepping = false;
         break;
     }
-
-    //_isLeftBumpSwitchOn
-    //_isRightBumpSwitchOn
-
-
-
 
     if (_isMotorStepping) {
         //stepperTimer.start();
