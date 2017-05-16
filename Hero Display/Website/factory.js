@@ -1,4 +1,4 @@
-1Snap.plugin( function( Snap, Element, Paper, global ) {
+Snap.plugin( function( Snap, Element, Paper, global ) {
   Element.prototype.addTransform = function( t ) {
     return this.transform( this.transform().localMatrix.toTransformString() + t );
   };
@@ -150,6 +150,7 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
 	};
 	
 	var panel3 = {
+        pointer: s('#path3819'),
 		numberIntegration1: [
 			sevenSegment('#g3833', '#g3821', '#g3837', '#g3845', '#g3825', '#g3841', '#g3829'),
 			sevenSegment('#g3861', '#g3849', '#g3865', '#g3873', '#g3853', '#g3869', '#g3857'),
@@ -190,11 +191,21 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
 
   hide(panel1.greenLight);
 
-  var count = 0;
+  var bb = panel3.pointer.getBBox();
+  var angle = 0;
   setInterval(function () {
-    count++;
-    displayNumber(count, panel1.greenNumbers);
+    angle++;
+    var matrix = new Snap.Matrix(1,0,0,1,0,0);
+    matrix.rotate(angle, bb.x2-10, bb.y+10);
+    panel3.pointer.attr({ transform: matrix });
   }, 10);
+  //panel3.pointer.transform('r90');
+
+  //var count = 0;
+  //setInterval(function () {
+  //  count++;
+  //  displayNumber(count, panel1.greenNumbers);
+  //}, 10);
 
   function loadData() {
     var headers = new Headers();
