@@ -4,10 +4,10 @@ It gets information about the machine from Particle firmware running on the same
 
 ### Running
 
-Start a web server here and view http://localhost:8080/factory.html
+Start a web server here and view http://localhost:8080/index.html
 
 ```
-ruby -run -e httpd -- .
+ruby -run -e httpd -- Website
 ```
 
 ### References

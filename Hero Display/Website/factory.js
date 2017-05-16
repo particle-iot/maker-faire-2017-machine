@@ -1,79 +1,136 @@
 Snap.plugin( function( Snap, Element, Paper, global ) {
-	Element.prototype.addTransform = function( t ) {
-		return this.transform( this.transform().localMatrix.toTransformString() + t );
-	};
+  Element.prototype.addTransform = function( t ) {
+    return this.transform( this.transform().localMatrix.toTransformString() + t );
+  };
 });
 
-var s = Snap('#drawing');
-s.attr({ viewBox: "0 0 850 680" });
+var snap = Snap('#drawing');
+snap.attr({ viewBox: "0 0 1920 1080" });
 
-var title;
-var factory, title, events;
-var cloudBack, cloudBackBubble1, cloudBackBubble2;
-var cloudFront, cloudFrontBubble1;
-
-Snap.load('cloud_factory.svg', function (f) {
-  cloudBack = f.select('#cloud_back');
-  cloudBackBubble1 = f.select('#cloud_back_bubble1');
-  cloudBackBubble2 = f.select('#cloud_back_bubble2');
-  cloudFront = f.select('#cloud_front');
-  cloudFrontBubble1 = f.select('#cloud_front_bubble1');
-
-  factory = f.select('g').addTransform('t100,100');
-  s.add(factory);
-
-  var bb = s.getBBox();
-  title = s.text(bb.cx, 50, 'Welcome to the Particle Cloud Event Factory!').attr({
-	'font-size': '30px',
-	'text-anchor': 'middle'
-  });
-  events = s.text(bb.cx, 610, '999 events published').attr({
-	'font-size': '30px',
-	'text-anchor': 'middle'
-  });
-
-  cloudBack.transform('t-20,0');
-  cloudBackBubble1.transform('t-10,0');
-  cloudBackBubble2.transform('t-2,0');
-  function animateClouds() {
-    var t = 3000;
-    var easing = mina.easeinout;
-    cloudBack.animate({
-	  transform: 't10,0'
-    }, t, easing, function () {
-	    cloudBack.animate({
-		  transform: 't-20,0'
-	    }, t, easing, animateClouds);
-    });
-    cloudBackBubble1.animate({
-	  transform: 't10,0'
-    }, t, easing, function () {
-	    cloudBackBubble1.animate({
-		  transform: 't-10,0'
-	    }, t, easing);
-    });
-    cloudBackBubble2.animate({
-	  transform: 't5,0'
-    }, t, easing, function () {
-	    cloudBackBubble2.animate({
-		  transform: 't-2,0'
-	    }, t, easing);
-    });
-    cloudFront.animate({
-	  transform: 't20,0'
-    }, t, easing, function () {
-	    cloudFront.animate({
-		  transform: 't0,0'
-	    }, t, easing);
-    });
-    cloudFrontBubble1.animate({
-	  transform: 't5,0'
-    }, t, easing, function () {
-	    cloudFrontBubble1.animate({
-		  transform: 't0,0'
-	    }, t, easing);
-    });
+Snap.load('maker-faire-control-panel.svg', function (f) {
+  function show(el) {
+    el.attr('visibility', 'visible');
   }
+
+  function hide(el) {
+    el.attr('visibility', 'hidden');
+  }
+
+  function s(id) {
+    return f.select(id);
+  }
+
+  function sevenSegment(top, topLeft, topRight, middle, bottomLeft, bottomRight, bottom) {
+    return [s(top), s(topLeft), s(topRight), s(middle), s(bottomLeft), s(bottomRight), s(bottom)];
+  }
+
+  var sevenSegementPatterns = [
+    // 0
+    [     true,
+     true,      true,
+          false,
+     true,      true,
+          true
+    ],
+    // 1
+    [     false,
+     false,      true,
+          false,
+     false,      true,
+          false
+    ],
+    // 2
+    [     true,
+     false,      true,
+          true,
+     true,      false,
+          true
+    ],
+    // 3
+    [     true,
+     false,      true,
+          true,
+     false,      true,
+          true
+    ],
+    // 4
+    [     false,
+     true,      true,
+          true,
+     false,     true,
+          false
+    ],
+    // 5
+    [     true,
+     true,      false,
+          true,
+     false,     true,
+          true
+    ],
+    // 6
+    [     true,
+     true,      false,
+          true,
+     true,      true,
+          true
+    ],
+    // 7
+    [     true,
+     false,      true,
+          false,
+     false,      true,
+          false
+    ],
+    // 8
+    [     true,
+     true,      true,
+          true,
+     true,      true,
+          true
+    ],
+    // 9
+    [     true,
+     true,      true,
+          true,
+     false,      true,
+          false
+    ],
+  ];
+  function displayDigit(digit, segments) {
+    var pattern = sevenSegementPatterns[digit];
+    for (var i = 0; i < 7; i++) {
+      if (pattern[i]) {
+	show(segments[i]);
+      } else {
+	hide(segments[i]);
+      }
+    }
+  }
+
+  function displayNumber(number, segmentsArray) {
+    displayDigit(Math.floor(number / 100) % 10, segmentsArray[0]);
+    displayDigit(Math.floor(number / 10) % 10, segmentsArray[1]);
+    displayDigit(number % 10, segmentsArray[2]);
+  }
+
+  var panel = s('#panel');
+  var panel1 = {
+    greenLight: s('#g3684'),
+    greenNumbers: [
+      sevenSegment('#g3348', '#g3336', '#g3352', '#g3360', '#g3340', '#g3356', '#g3344'),
+      sevenSegment('#g3376', '#g3364', '#g3380', '#g3388', '#g3368', '#g3384', '#g3372'),
+      sevenSegment('#g3404', '#g3392', '#g3408', '#g3416', '#g3396', '#g3412', '#g3400'),
+    ]
+  };
+  snap.add(panel);
+
+  hide(panel1.greenLight);
+
+  var count = 0;
+  setInterval(function () {
+    count++;
+    displayNumber(count, panel1.greenNumbers);
+  }, 10);
 
   function loadData() {
     var headers = new Headers();
@@ -117,6 +174,5 @@ Snap.load('cloud_factory.svg', function (f) {
     });
   }
 
-  animateClouds();
-  loadData();
+  //loadData();
 });
