@@ -22,7 +22,6 @@ bool runMachine = AUTO_START;
  * Pin usage:
  */
 
-const auto NEOPIXEL_PIN = D0;
 const auto CAN_BUS_PINS = CAN_D1_D2;
 const auto BALL_PUMP_PIN = D3;
 const auto HOPPER_PIN = D4;
@@ -30,44 +29,20 @@ const auto TURBINES_PIN = D5;
 // D6 spare relay shield pin
 
 const auto BUTTON_RED_PIN = A0;
-const auto TRACK_1_DETECTOR_1_PIN = A1;
-const auto TRACK_2_DETECTOR_2_PIN = A2;
-const auto TRACK_3_DETECTOR_3_PIN = A3;
-const auto INPUT_TRACK_DETECTOR = A4;
+const auto BALL_DETECTOR_1_PIN = A1;
+const auto BALL_DETECTOR_2_PIN = A2;
+const auto BALL_DETECTOR_3_PIN = A3;
+const auto INPUT_BALL_DETECTOR_PIN = A4;
 const auto BUTTON_GREEN_PIN = A5;
 const auto BUTTON_BLUE_PIN = A6;
-
-// TODO
+const auto LASER_ENABLE_PIN = A7;
+const auto SERVO_PIN = TX;
 
 /*
  * CAN communication
  */
 BuiltinCAN can(CAN_BUS_PINS);
 Communication comms(can);
-
-/*
- * Input crank encoder
- */
-Encoder inputEncoder(INPUT_CRANK_ENCODER_A_PIN, INPUT_CRANK_ENCODER_B_PIN);
-
-/*
- * Ball wheel encoder
- */
-Encoder wheelEncoder(BALL_WHEEL_ENCODER_A_PIN, BALL_WHEEL_ENCODER_B_PIN);
-
-/*
- * Ball detectors
- */
-BeamDetector detector1(BALL_DETECTOR_1_PIN, LASER_ENABLE_PIN);
-BeamDetector detector2(BALL_DETECTOR_2_PIN, LASER_ENABLE_PIN);
-BeamDetector detector3(BALL_DETECTOR_3_PIN, LASER_ENABLE_PIN);
-
-/*
- * Servos
- */
-
-Servo servo1;
-Servo servo2;
 
 /*
  * Config stored in EEPROM
@@ -77,37 +52,29 @@ struct Config {
   uint32_t ballCount1;
   uint32_t ballCount2;
   uint32_t ballCount3;
-  uint16_t inputCrankPulsesPerRevolution;
-  uint16_t inputCrankInterval;
-  float ballWheelSpeedFactor;
-  uint16_t ballWheelMinSpeed;
-  uint16_t ballWheelMaxSpeed;
-  uint8_t ballWheelStallDetection;
-  uint8_t autoDoors;
-  float wheelPulsesPerBall;
-  uint8_t servo1OpenPos;
-  uint8_t servo1ClosedPos;
-  uint8_t servo2OpenPos;
-  uint8_t servo2ClosedPos;
+  uint8_t servoPos1;
+  uint8_t servoPos2;
+  uint8_t servoPos3;
+  uint16_t trackSelectTime;
+  uint16_t ballPumpRunTime;
+  uint16_t hopperStartDelay;
+  uint16_t hopperStopDelay;
+  uint16_t hopperMaxRunTime;
 } config;
 
 Config defaultConfig = {
-  /* app */ APP_CODE('M', 'F', '3', 7), // increment last digit to reset EEPROM on boot
+  /* app */ APP_CODE('M', 'F', '1', 0), // increment last digit to reset EEPROM on boot
   /* ballCount1 */ 0,
   /* ballCount2 */ 0,
   /* ballCount3 */ 0,
-  /* inputCrankPulsesPerRevolution */ 1200,
-  /* inputCrankInterval */ 100,
-  /* ballWheelSpeedFactor */ 600.0,
-  /* ballWheelMinSpeed */ 200,
-  /* ballWheelMaxSpeed */ 4000,
-  /* ballWheelStallDetection */ 0,
-  /* autoDoors */ 1,
-  /* wheelPulsesPerBall */ 2400 / 36.0,
-  /* servo1OpenPos */ 69,
-  /* servo1ClosedPos */ 99,
-  /* servo2OpenPos */ 65,
-  /* servo2ClosedPos */ 95,
+  /* servoPos1 */ 60,
+  /* servoPos2 */ 80,
+  /* servoPos3 */ 100,
+  /* trackSelectTime */ 500,
+  /* ballPumpRunTime */ 3000,
+  /* hopperStartDelay */ 2000,
+  /* hopperStopDelay */ 1000,
+  /* hopperMaxRunTime */ 5000,
 };
 
 Storage<Config> storage(defaultConfig);
@@ -121,7 +88,10 @@ void setup() {
   loadStorage();
   setupComms();
   setupDetectors();
-  setupMotor();
+  setupButtons();
+  setupBallPump();
+  setupTurbines();
+  setupHopper();
   setupServos();
 }
 
@@ -133,8 +103,10 @@ void loop() {
   receiveComms();
   registerCloud();
   updateDetectors();
-  readInputCrank();
-  controlMotor();
+  updateButtons();
+  controlHopper();
+  doPanelControl();
+  controlBallPump();
   controlServos();
   printStatus();
   transmitComms();
@@ -142,12 +114,17 @@ void loop() {
 }
 
 /*
- * Beam detectors
+ * Ball detectors
  */
+BeamDetector detector1(BALL_DETECTOR_1_PIN, LASER_ENABLE_PIN);
+BeamDetector detector2(BALL_DETECTOR_2_PIN, LASER_ENABLE_PIN);
+BeamDetector detector3(BALL_DETECTOR_3_PIN, LASER_ENABLE_PIN);
+BeamDetector inputDetector(INPUT_BALL_DETECTOR_PIN, LASER_ENABLE_PIN);
 
 bool beamBroken1 = false;
 bool beamBroken2 = false;
 bool beamBroken3 = false;
+bool beamBrokenInput = false;
 uint32_t ballCount1 = 0;
 uint32_t ballCount2 = 0;
 uint32_t ballCount3 = 0;
@@ -156,6 +133,7 @@ void setupDetectors() {
   detector1.begin(BeamDetector::POWER_OFF);
   detector2.begin(BeamDetector::POWER_OFF);
   detector3.begin(BeamDetector::POWER_OFF);
+  inputDetector.begin(BeamDetector::POWER_OFF);
 
   // restore ballCounts from storage
   ballCount1 = config.ballCount1;
@@ -167,10 +145,12 @@ void updateDetectors() {
   detector1.enable(runMachine);
   detector2.enable(runMachine);
   detector3.enable(runMachine);
+  inputDetector.enable(runMachine);
 
   beamBroken1 = detector1.beamBroken();
   beamBroken2 = detector2.beamBroken();
   beamBroken3 = detector3.beamBroken();
+  beamBrokenInput = inputDetector.beamBroken();
 
   // Count balls
   static uint32_t oldDetectionCount1 = 0;
@@ -196,190 +176,219 @@ void updateDetectors() {
 }
 
 /*
- * Input crank
+ * Big buttons!
  */
+bool redButtonPressed = false;
+bool greenButtonPressed = false;
+bool blueButtonPressed = false;
 
-uint32_t inputCrankLastUpdate = 0;
-long inputCrankPosition = 0;
-long lastInputCrankPosition = 0;
-float inputCrankSpeed = 0;
-float inputCrankFactor = 0;
+const auto BUTTON_PRESSED = LOW;
 
-void readInputCrank() {
-  // // FIXME: input bypassed to serial
-  // if (Serial.available()) {
-  //   char c = Serial.read();
-  //   if (c >= '0' && c <= '9') {
-  //     inputCrankSpeed = (c - '0') * 0.66;
-  //   }
-  // }
-  // return;
-
-  auto now = millis();
-  if (now - inputCrankLastUpdate < config.inputCrankInterval) {
-    return;
-  }
-  inputCrankLastUpdate = now;
-
-  inputCrankPosition = inputEncoder.read();
-  long deltaPosition = inputCrankPosition - lastInputCrankPosition;
-  lastInputCrankPosition = inputCrankPosition;
-
-  /* Convert pulses since the last interval to speed
-   * speed_revolution_per_second = (pulses / pulses_per_revolution) / interval_ms * 1000 * ms_per_second
-   */
-  if (inputCrankFactor == 0) {
-    // cache inputCrankFactor since it doesn't change often
-    updateInputCrankFactor();
-  }
-  if (deltaPosition > 0) {
-    inputCrankSpeed = deltaPosition * inputCrankFactor;
-  } else {
-    inputCrankSpeed = 0;
-  }
-  //Serial.printlnf("pos=%d delta=%d speed=%f", position, deltaPosition, inputCrankSpeed);
+void setupButtons() {
+  const auto mode = INPUT_PULLUP;
+  pinMode(BUTTON_RED_PIN, mode);
+  pinMode(BUTTON_GREEN_PIN, mode);
+  pinMode(BUTTON_BLUE_PIN, mode);
 }
 
-void updateInputCrankFactor() {
-  inputCrankFactor = 1000.0 / (config.inputCrankPulsesPerRevolution * config.inputCrankInterval);
+void updateButtons() {
+  redButtonPressed = digitalRead(BUTTON_RED_PIN) == BUTTON_PRESSED;
+  greenButtonPressed = digitalRead(BUTTON_GREEN_PIN) == BUTTON_PRESSED;
+  blueButtonPressed = digitalRead(BUTTON_BLUE_PIN) == BUTTON_PRESSED;
 }
 
 /*
- * Motor control
+ * Ball pump
  */
 
-const auto MOTOR_RUN = HIGH;
-const auto MOTOR_KILL = LOW;
+const auto BALL_PUMP_RUN = HIGH;
+const auto BALL_PUMP_STOP = LOW;
 
-auto motorState = AUTO_START ? MOTOR_RUN : MOTOR_KILL;
-uint32_t motorSpeed = 0;
+bool runBallPump = false;
 
-uint32_t motorControlLastUpdate = 0;
-const auto motorControlInterval = 100;
-const auto motorStallMaxTime = 1000;
-long wheelPosition = 0;
-long oldWheelPosition = 0;
-uint16_t motorStallCounter = 0;
-
-void setupMotor() {
-  pinMode(BALL_WHEEL_KILL_SWITCH_PIN, OUTPUT);
-  digitalWrite(BALL_WHEEL_KILL_SWITCH_PIN, MOTOR_KILL);
-  pinMode(BALL_WHEEL_MOTOR_SPEED_PIN, OUTPUT);
+void setupBallPump() {
+  pinMode(BALL_PUMP_PIN, OUTPUT);
+  digitalWrite(BALL_PUMP_PIN, BALL_PUMP_STOP);
 }
 
-void controlMotor() {
+void controlBallPump() {
+  digitalWrite(BALL_PUMP_PIN, runMachine && runBallPump ? BALL_PUMP_RUN : BALL_PUMP_STOP);
+}
+
+/*
+ * Wind turbines
+ */
+
+const auto TURBINES_RUN = HIGH;
+const auto TURBINES_STOP = LOW;
+
+bool spinTurbines = false;
+
+void setupTurbines() {
+  pinMode(TURBINES_PIN, OUTPUT);
+  digitalWrite(TURBINES_PIN, TURBINES_STOP);
+}
+
+void controlTurbines() {
+  digitalWrite(TURBINES_PIN, runMachine && spinTurbines ? TURBINES_RUN : TURBINES_STOP);
+}
+
+/*
+ * Ball hopper
+ */
+
+const auto HOPPER_STOP = HIGH;
+const auto HOPPER_RUN = LOW;
+
+bool runHopper = false;
+
+enum HopperState_e {
+  HOPPER_IDLE,
+  HOPPER_RUNNING,
+  HOPPER_TIMEOUT
+} hopperState = HOPPER_IDLE;
+
+uint32_t lastInputDetectionTime = 0;
+uint32_t lastInputGapTime = 0;
+uint32_t hopperStartTime = 0;
+
+void setupHopper() {
+  pinMode(HOPPER_PIN, OUTPUT);
+  digitalWrite(HOPPER_PIN, HOPPER_STOP);
+}
+
+void controlHopper() {
+  // Run the hopper when there's no ball in front of the detector for a while
   auto now = millis();
-  if (now - motorControlLastUpdate < motorControlInterval) {
-    return;
-  }
-  motorControlLastUpdate = now;
-
-  // Scale input crank speed to a voltage in the 0-3.3V range to send to
-  // the motor controller
-  uint16_t maxSpeed = min(config.ballWheelMaxSpeed, 4095);
-  motorSpeed = (uint32_t)(inputCrankSpeed * config.ballWheelSpeedFactor) + config.ballWheelMinSpeed;
-
-  if (motorSpeed > maxSpeed) {
-    motorSpeed = maxSpeed;
-  }
-
-  wheelPosition = wheelEncoder.read();
-
-  // Safety setting of the motor
-  // if the desired motor speed > 0 and there were no pulses on the encoder for 1 second,
-  // trigger the motor controller kill switch until the machine start button is pressed again
-  if (config.ballWheelStallDetection && inputCrankSpeed > 0) {
-    if (wheelPosition == oldWheelPosition) {
-      motorStallCounter++;
-    }
+  if (beamBrokenInput) {
+    lastInputDetectionTime = now;
   } else {
-    motorStallCounter = 0;
+    lastInputGapTime = now;
   }
 
-  // Stop the motor when the machine stop button is pressed
-  // Start the motor when the machine start button is pressed
-  // Stop the motor when the motor is powered but not moving
-  if (!runMachine) {
-    motorState = MOTOR_KILL;
-  } else if (comms.MachineStart) {
-    motorState = MOTOR_RUN;
-  } else if (motorStallCounter > motorStallMaxTime / motorControlInterval) {
-    motorState = MOTOR_KILL;
+  switch (hopperState) {
+    case HOPPER_IDLE:
+      if (now - lastInputDetectionTime > config.hopperStartDelay) {
+        hopperState = HOPPER_RUNNING;
+        hopperStartTime = now;
+        runHopper = true;
+      }
+      break;
+    case HOPPER_RUNNING:
+      if (beamBrokenInput && now - lastInputGapTime > config.hopperStopDelay) {
+        hopperState = HOPPER_IDLE;
+        runHopper = false;
+      //} else if (now - hopperStartTime > config.hopperMaxRunTime) {
+      //  hopperState = HOPPER_TIMEOUT;
+      }
+      break;
+
+    // FIXME: timeout was meant for case where the input is full but the
+    // beam is not broken. Disabled because there's no good way to get
+    // out of a timeout
+    //case HOPPER_TIMEOUT:
+    //  if (beamBrokenInput) {
+    //    hopperState = HOPPER_IDLE;
+    //  }
+    //  break;
   }
 
-  oldWheelPosition = wheelPosition;
-
-  digitalWrite(BALL_WHEEL_KILL_SWITCH_PIN, motorState);
-  analogWrite(BALL_WHEEL_MOTOR_SPEED_PIN, runMachine ? motorSpeed : 0);
+  digitalWrite(HOPPER_PIN, runMachine && runHopper ? HOPPER_RUN : HOPPER_STOP);
 }
 
 /*
  * Servos
  */
+Servo servo;
 
-const auto SERVO_RUN = HIGH;
-const auto SERVO_KILL = LOW;
+uint8_t servoPos = 0;
+bool autoServo = true;
 
-uint8_t servo1Pos = 0;
-uint8_t servo2Pos = 0;
-
-uint32_t servoControlLastUpdate = 0;
-const auto servoControlInterval = 100;
-
-uint32_t servoActuations = 0;
-uint32_t lastServoActuations = 0;
-
-enum DoorState_e {
-  DOORS_CLOSED,
-  DOOR1_OPEN,
-  DOOR2_OPEN,
-  DOOR_STATE_MAX
-} doorState = DOORS_CLOSED;
+enum TrackSelectorState_e {
+  TRACK_1,
+  TRACK_2,
+  TRACK_3
+} trackSelectorState = TRACK_1;
 
 void setupServos() {
-  servo1.attach(SERVO_1_PIN);
-  servo2.attach(SERVO_2_PIN);
-  pinMode(SERVO_ENABLE_PIN, OUTPUT);
-  digitalWrite(SERVO_ENABLE_PIN, SERVO_KILL);
+  servoPos = config.servoPos1;
+  servo.attach(SERVO_PIN);
+  servo.write(servoPos);
 }
 
 void controlServos() {
-  auto now = millis();
-  if (now - servoControlLastUpdate < servoControlInterval) {
-    return;
-  }
-  servoControlLastUpdate = now;
-
-  if (config.autoDoors) {
-    // Change the servo position for every ball by counting the number of
-    // pulses on the ball wheel
-    servoActuations = (uint32_t)(wheelPosition / config.wheelPulsesPerBall);
-    if (servoActuations != lastServoActuations) {
-      // Pick a new door
-      doorState = (DoorState_e)(random(DOOR_STATE_MAX));
+  // Update the position of the servo from the desired active track
+  if (autoServo) {
+    switch (trackSelectorState) {
+      case TRACK_1:
+        servoPos = config.servoPos1;
+        break;
+      case TRACK_2:
+        servoPos = config.servoPos2;
+        break;
+      case TRACK_3:
+        servoPos = config.servoPos3;
+        break;
     }
-    lastServoActuations = servoActuations;
   }
 
-  switch (doorState) {
-    case DOOR1_OPEN:
-      servo1Pos = config.servo1OpenPos;
-      servo2Pos = config.servo2ClosedPos;
-      break;
-    case DOOR2_OPEN:
-      servo1Pos = config.servo1ClosedPos;
-      servo2Pos = config.servo2OpenPos;
-      break;
-    default:
-      servo1Pos = config.servo1ClosedPos;
-      servo2Pos = config.servo2ClosedPos;
-      break;
+  if (runMachine) {
+    servo.write(servoPos);
   }
-
-  servo1.write(servo1Pos);
-  servo2.write(servo2Pos);
-  digitalWrite(SERVO_ENABLE_PIN, runMachine ? SERVO_RUN : SERVO_KILL);
 }
+
+/*
+ * Main panel control
+ */
+
+enum PanelState_e {
+  PANEL_IDLE,
+  PANEL_SELECT_TRACK,
+  PANEL_RUN_PUMP,
+} panelState = PANEL_IDLE;
+
+uint32_t trackSelectStartTime = 0;
+uint32_t ballPumpStartTime = 0;
+
+void doPanelControl() {
+  auto now = millis();
+
+  switch (panelState) {
+    case PANEL_IDLE:
+      if (redButtonPressed || greenButtonPressed || blueButtonPressed) {
+        panelState = PANEL_SELECT_TRACK;
+        trackSelectStartTime = now;
+        if (redButtonPressed) {
+          trackSelectorState = TRACK_1;
+          spinTurbines = true;
+        } else if (greenButtonPressed) {
+          trackSelectorState = TRACK_2;
+        } else if (blueButtonPressed) {
+          trackSelectorState = TRACK_3;
+        }
+      }
+
+    case PANEL_SELECT_TRACK:
+      if (now - trackSelectStartTime > config.trackSelectTime) {
+        panelState = PANEL_RUN_PUMP;
+        ballPumpStartTime = now;
+        runBallPump = true;
+      }
+      break;
+
+    case PANEL_RUN_PUMP:
+      if (now - ballPumpStartTime > config.ballPumpRunTime) {
+        panelState = PANEL_IDLE;
+        runBallPump = false;
+      }
+      break;
+  }
+
+  if (spinTurbines && beamBroken1) {
+    spinTurbines = false;
+  }
+}
+
 
 /*
  * CAN communication
@@ -399,14 +408,17 @@ void receiveComms() {
 }
 
 void transmitComms() {
-  comms.Input3Active = (inputCrankSpeed > 0);
-  comms.InputCrankSpeed = inputCrankSpeed;
+  comms.Input1Active = redButtonPressed || greenButtonPressed || blueButtonPressed;
+  comms.RedButtonPressed = redButtonPressed;
+  comms.GreenButtonPressed = greenButtonPressed;
+  comms.BlueButtonPressed = blueButtonPressed;
 
-  comms.IntegrationCountA = ballCount1;
-  comms.IntegrationCountB = ballCount2;
-  comms.IntegrationCountC = ballCount3;
+  comms.BallCount3 = ballCount1 + ballCount2 + ballCount3;
+  comms.RedBallCount = ballCount1;
+  comms.GreenBallCount = ballCount2;
+  comms.BlueBallCount = ballCount3;
 
-  comms.transmit(MachineModules::Panel3);
+  comms.transmit(MachineModules::Panel1);
 }
 
 /*
@@ -424,20 +436,12 @@ void printStatus() {
   printLastUpdate = now;
 
   Serial.printlnf(
-    "%s crank=%d speed=%f wheel=%d motor=%d/%d stall=%d door=%d/%d/%d beams=%d/%d/%d balls=%d/%d/%d",
-    runMachine ? "RUN " : "KILL ",
-    inputCrankPosition,
-    inputCrankSpeed,
-    wheelPosition,
-    motorSpeed,
-    motorState,
-    motorStallCounter,
-    doorState,
-    servo1Pos,
-    servo2Pos,
+    "servo=%d beams=%d/%d/%d/%d balls=%d/%d/%d",
+    servoPos,
     beamBroken1,
     beamBroken2,
     beamBroken3,
+    beamBrokenInput,
     ballCount1,
     ballCount2,
     ballCount3
@@ -452,7 +456,10 @@ void registerCloud() {
   if (!registered && Particle.connected()) {
     registered = true;
     Particle.function("set", setConfigFromCloud);
-    Particle.function("door", changeDoorState);
+    Particle.function("servo", overrideServoPos);
+    Particle.function("pump", overrideBallPump);
+    Particle.function("hopper", overrideHopper);
+    Particle.function("turbines", overrideTurbines);
   }
 }
 
@@ -474,34 +481,22 @@ int setConfigFromCloud(String arg) {
     } else if (name.equals("ballCount3")) {
       config.ballCount3 = value.toInt();
       ballCount3 = config.ballCount3;
-    } else if (name.equals("inputCrankPulsesPerRevolution")) {
-      config.inputCrankPulsesPerRevolution = value.toInt();
-      // recompute cached factor
-      updateInputCrankFactor();
-    } else if (name.equals("inputCrankInterval")) {
-      config.inputCrankInterval = value.toInt();
-      // recompute cached factor
-      updateInputCrankFactor();
-    } else if (name.equals("ballWheelSpeedFactor")) {
-      config.ballWheelSpeedFactor = value.toFloat();
-    } else if (name.equals("ballWheelMinSpeed")) {
-      config.ballWheelMinSpeed = value.toInt();
-    } else if (name.equals("ballWheelMaxSpeed")) {
-      config.ballWheelMaxSpeed = value.toInt();
-    } else if (name.equals("ballWheelStallDetection")) {
-      config.ballWheelStallDetection = value.toInt();
-    } else if (name.equals("autoDoors")) {
-      config.autoDoors = value.toInt();
-    } else if (name.equals("wheelPulsesPerBall")) {
-      config.wheelPulsesPerBall = value.toFloat();
-    } else if (name.equals("servo1OpenPos")) {
-      config.servo1OpenPos = value.toInt();
-    } else if (name.equals("servo1ClosedPos")) {
-      config.servo1ClosedPos = value.toInt();
-    } else if (name.equals("servo2OpenPos")) {
-      config.servo2OpenPos = value.toInt();
-    } else if (name.equals("servo2ClosedPos")) {
-      config.servo2ClosedPos = value.toInt();
+    } else if (name.equals("servoPos1")) {
+      config.servoPos1 = value.toInt();
+    } else if (name.equals("servoPos2")) {
+      config.servoPos2 = value.toInt();
+    } else if (name.equals("servoPos3")) {
+      config.servoPos3 = value.toInt();
+    } else if (name.equals("trackSelectTime")) {
+      config.trackSelectTime = value.toInt();
+    } else if (name.equals("ballPumpRunTime")) {
+      config.ballPumpRunTime = value.toInt();
+    } else if (name.equals("hopperStartDelay")) {
+      config.hopperStartDelay = value.toInt();
+    } else if (name.equals("hopperStopDelay")) {
+      config.hopperStopDelay = value.toInt();
+    } else if (name.equals("hopperMaxRunTime")) {
+      config.hopperMaxRunTime = value.toInt();
     } else {
       return -2;
     }
@@ -510,8 +505,24 @@ int setConfigFromCloud(String arg) {
     return 0;
 }
 
-int changeDoorState(String arg) {
-  doorState = (DoorState_e) arg.toInt();
+int overrideServoPos(String arg) {
+  servoPos = arg.toInt();
+  autoServo = false;
+  return 0;
+}
+
+int overrideBallPump(String arg) {
+  runBallPump = arg.toInt();
+  return 0;
+}
+
+int overrideHopper(String arg) {
+  runHopper = arg.toInt();
+  return 0;
+}
+
+int overrideTurbines(String arg) {
+  spinTurbines = arg.toInt();
   return 0;
 }
 

@@ -401,6 +401,7 @@ void transmitComms() {
   comms.Input3Active = (inputCrankSpeed > 0);
   comms.InputCrankSpeed = inputCrankSpeed;
 
+  comms.BallCount3 = ballCount1 + ballCount2 + ballCount3;
   comms.IntegrationCountA = ballCount1;
   comms.IntegrationCountB = ballCount2;
   comms.IntegrationCountC = ballCount3;
