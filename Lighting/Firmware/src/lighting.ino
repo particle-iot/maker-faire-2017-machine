@@ -487,7 +487,6 @@ void display() {
     }
   }
   strip.show();
-  strip.show();
 }
 
 uint32_t normalizeColor(uint32_t c) {

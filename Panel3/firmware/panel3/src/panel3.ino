@@ -25,13 +25,13 @@ bool runMachine = AUTO_START;
 
 const auto LASER_ENABLE_PIN = D0;
 const auto CAN_BUS_PINS = CAN_D1_D2;
-const auto INPUT_CRANK_ENCODER_B_PIN = D3;
-const auto INPUT_CRANK_ENCODER_A_PIN = D4;
-const auto BALL_WHEEL_ENCODER_B_PIN = D5;
-const auto BALL_WHEEL_ENCODER_A_PIN = D6;
+const auto BALL_WHEEL_ENCODER_B_PIN = D3;
+const auto BALL_WHEEL_ENCODER_A_PIN = D4;
+const auto INPUT_CRANK_ENCODER_B_PIN = D5;
+const auto INPUT_CRANK_ENCODER_A_PIN = D6;
 const auto SERVO_ENABLE_PIN = A0;
-const auto BALL_DETECTOR_1_PIN = A1;
-const auto BALL_DETECTOR_2_PIN = A2;
+const auto BALL_DETECTOR_2_PIN = A1;
+const auto BALL_DETECTOR_1_PIN = A2;
 const auto BALL_WHEEL_KILL_SWITCH_PIN = A3;
 const auto SERVO_1_PIN = A4;
 const auto SERVO_2_PIN = A5;
@@ -81,6 +81,7 @@ struct Config {
   float ballWheelSpeedFactor;
   uint16_t ballWheelMinSpeed;
   uint16_t ballWheelMaxSpeed;
+  uint8_t ballWheelStallDetection;
   uint16_t wheelPulsesPerBall;
   uint8_t servo1OpenPos;
   uint8_t servo1ClosedPos;
@@ -89,15 +90,16 @@ struct Config {
 } config;
 
 Config defaultConfig = {
-  /* app */ APP_CODE('M', 'F', '3', 3), // increment last digit to reset EEPROM on boot
+  /* app */ APP_CODE('M', 'F', '3', 4), // increment last digit to reset EEPROM on boot
   /* ballCount1 */ 0,
   /* ballCount2 */ 0,
   /* ballCount3 */ 0,
-  /* inputCrankPulsesPerRevolution */ 600,
+  /* inputCrankPulsesPerRevolution */ 1200,
   /* inputCrankInterval */ 100,
   /* ballWheelSpeedFactor */ 600.0,
   /* ballWheelMinSpeed */ 200,
   /* ballWheelMaxSpeed */ 4000,
+  /* ballWheelStallDetection */ 1,
   /* wheelPulsesPerBall */ 40,
   /* servo1OpenPos */ 20,
   /* servo1ClosedPos */ 160,
@@ -195,20 +197,30 @@ void updateDetectors() {
  */
 
 uint32_t inputCrankLastUpdate = 0;
+long inputCrankPosition = 0;
 long lastInputCrankPosition = 0;
 float inputCrankSpeed = 0;
 float inputCrankFactor = 0;
 
 void readInputCrank() {
+  // // FIXME: input bypassed to serial
+  // if (Serial.available()) {
+  //   char c = Serial.read();
+  //   if (c >= '0' && c <= '9') {
+  //     inputCrankSpeed = (c - '0') * 0.66;
+  //   }
+  // }
+  // return;
+
   auto now = millis();
   if (now - inputCrankLastUpdate < config.inputCrankInterval) {
     return;
   }
   inputCrankLastUpdate = now;
 
-  long position = inputEncoder.read();
-  long deltaPosition = position - lastInputCrankPosition;
-  lastInputCrankPosition = position;
+  inputCrankPosition = inputEncoder.read();
+  long deltaPosition = inputCrankPosition - lastInputCrankPosition;
+  lastInputCrankPosition = inputCrankPosition;
 
   /* Convert pulses since the last interval to speed
    * speed_revolution_per_second = (pulses / pulses_per_revolution) / interval_ms * 1000 * ms_per_second
@@ -233,11 +245,8 @@ void updateInputCrankFactor() {
  * Motor control
  */
 
-const auto MOTOR_RUN = LOW;
-const auto MOTOR_KILL = HIGH;
-
-// turn stall detection off during development if the wheel encoder is not connected
-const auto ENABLE_STALL_DETECTION = true;
+const auto MOTOR_RUN = HIGH;
+const auto MOTOR_KILL = LOW;
 
 auto motorState = AUTO_START ? MOTOR_RUN : MOTOR_KILL;
 uint32_t motorSpeed = 0;
@@ -276,7 +285,7 @@ void controlMotor() {
   // Safety setting of the motor
   // if the desired motor speed > 0 and there were no pulses on the encoder for 1 second,
   // trigger the motor controller kill switch until the machine start button is pressed again
-  if (ENABLE_STALL_DETECTION && inputCrankSpeed > 0) {
+  if (config.ballWheelStallDetection && inputCrankSpeed > 0) {
     if (wheelPosition == oldWheelPosition) {
       motorStallCounter++;
     }
@@ -311,7 +320,7 @@ const auto SERVO_KILL = HIGH;
 uint8_t servo1Pos = 0;
 uint8_t servo2Pos = 0;
 
-enum {
+enum DoorState_e {
   DOORS_CLOSED,
   DOOR1_OPEN,
   DOOR2_OPEN,
@@ -386,7 +395,8 @@ void printStatus() {
   printLastUpdate = now;
 
   Serial.printlnf(
-    "crank=%f wheel=%d motor=%d/%d stall=%d beams=%d/%d/%d balls=%d/%d/%d",
+    "crank=%d speed=%f wheel=%d motor=%d/%d stall=%d beams=%d/%d/%d balls=%d/%d/%d",
+    inputCrankPosition,
     inputCrankSpeed,
     wheelPosition,
     motorSpeed,
@@ -445,6 +455,8 @@ int setConfigFromCloud(String arg) {
       config.ballWheelMinSpeed = value.toInt();
     } else if (name.equals("ballWheelMaxSpeed")) {
       config.ballWheelMaxSpeed = value.toInt();
+    } else if (name.equals("ballWheelStallDetection")) {
+      config.ballWheelStallDetection = value.toInt();
     } else if (name.equals("wheelPulsesPerBall")) {
       config.wheelPulsesPerBall = value.toInt();
     } else if (name.equals("servo1OpenPos")) {
@@ -464,7 +476,7 @@ int setConfigFromCloud(String arg) {
 }
 
 int changeDoorState(String arg) {
-  doorState = arg.toInt();
+  doorState = (DoorState_e) arg.toInt();
   return 0;
 }
 

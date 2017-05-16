@@ -1,0 +1,20 @@
+ 1 CANL green
+ 2 CANH yellow
+ 3 S2 white
+ 4 S3 white
+ 5 LG black
+ 6 LV orange
+ 7 3.3V orange
+ 8 SIG1 blue
+ 9 SIG2 green
+10 SIG3 yellow
+11 5V orange
+12 GND black
+13 S1 white
+14 STEP white
+15 3.3V orange
+16 GND black
+17 HRST blue
+18 HTS white
+19 SCL green
+20 SDA yellow
