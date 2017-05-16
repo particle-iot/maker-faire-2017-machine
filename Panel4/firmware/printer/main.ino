@@ -104,6 +104,7 @@ void checkButtons() {
 
             Serial.println("Printing image " + String(imageNumber));
 
+            //printImageFile(190, 190, "particle_logo.raw");
             printImage(imageNumber);
         }
     }
@@ -114,29 +115,40 @@ void printImage(int imageNumber) {
 
     switch(imageNumber) {
         case 1:
-            printImageFile(202, 380, "candy_image.raw");
+            //printImageFile(202, 380, "candy_image.raw");
+            printImageFile(271, 393, "p_candy.raw");
         break;
 
         case 2:
-            printImageFile(380, 518, "coupon.raw");
+            //printImageFile(380, 518, "coupon.raw");
+            //printImageFile(200, 264, "coupon2.raw");
+            printImageFile(271, 393, "p_coupon.raw");
         break;
 
         case 3:
-            printImageFile(229, 380, "money.raw");
+            //printImageFile(229, 380, "money.raw");
+            printImageFile(271, 393, "p_money.raw");
+        break;
+
+        case 4:
+            printImageFile(190, 190, "particle_logo.raw");
         break;
 
         // //TODO: obviously remove this before production
-        // case 99:
-        //     printImageFile(204, 247, "etjgJ2D.raw");
-        // break;
+//        case 99:
+//             printImageFile(204, 247, "etjgJ2D.raw");
+//        break;
     }
 }
 
 void printImageFile(int width, int height, String filename) {
     File imageFile = SD.open(filename.c_str(), FILE_READ);
       if (!imageFile.isOpen()) {
+        Serial.println("unable to open " + filename);
         _printer.write("failed to open file", 19);
         _printer.feed(3);
+
+        //TODO: print files I can see?
       }
       else {
           _printer.feed(2);
