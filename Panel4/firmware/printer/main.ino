@@ -8,7 +8,7 @@ SYSTEM_THREAD(ENABLED);
 #include "cdam_const_config.h"
 #define kIntervalPrinterMillis 100
 
-#define PRINT_DELAY 5000
+#define PRINT_DELAY 1000
 unsigned long lastPrintTime = 0;
 
 int counters[4] = {0,0,0,0};
@@ -42,10 +42,10 @@ void setup() {
       }
 
     // buttons
-    pinMode(D1, INPUT_PULLUP);
-  	pinMode(D2, INPUT_PULLUP);
-	pinMode(D3, INPUT_PULLUP);
-	pinMode(D4, INPUT_PULLUP);
+    pinMode(D1, INPUT);
+  	pinMode(D2, INPUT);
+	pinMode(D3, INPUT);
+	pinMode(D4, INPUT);
 
 	//TODO: CAN-BUS PUBLISH COUNTS
 
@@ -90,11 +90,19 @@ void checkButtons() {
         lastPrintTime = now;
 
         if (imageNumber >= 0) {
-            // Serial.println("pin D1 is " + (digitalRead(D1) ? String("HIGH") : String("LOW")));
-            // Serial.println("pin D2 is " + (digitalRead(D2) ? String("HIGH") : String("LOW")));
-            // Serial.println("pin D3 is " + (digitalRead(D3) ? String("HIGH") : String("LOW")));
-            // Serial.println("pin D4 is " + (digitalRead(D4) ? String("HIGH") : String("LOW")));
-            // Serial.println("Printing image " + String(imageNumber));
+//            Serial.println("the time is " + String(millis()));
+//            Serial.println("pin D1 is " + (digitalRead(D1) ? String("HIGH") : String("LOW")));
+//            Serial.println("pin D2 is " + (digitalRead(D2) ? String("HIGH") : String("LOW")));
+//            Serial.println("pin D3 is " + (digitalRead(D3) ? String("HIGH") : String("LOW")));
+//            Serial.println("pin D4 is " + (digitalRead(D4) ? String("HIGH") : String("LOW")));
+//
+////            Serial.println("analog D1 is " + String(analogRead(D1)));
+////            Serial.println("analog D2 is " + String(analogRead(D2)));
+////            Serial.println("analog D3 is " + String(analogRead(D3)));
+////            Serial.println("analog D4 is " + String(analogRead(D4)));
+//
+
+            Serial.println("Printing image " + String(imageNumber));
 
             printImage(imageNumber);
         }
