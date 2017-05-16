@@ -478,3 +478,12 @@ html, body, #drawing {
   width: 100%;
 }
 
+@font-face {
+    font-family: 'Play-Regular';
+    src: url(Play-Regular.ttf);
+}
+
+@font-face {
+    font-family: 'Play-Bold';
+    src: url(Play-Bold.ttf);
+}
