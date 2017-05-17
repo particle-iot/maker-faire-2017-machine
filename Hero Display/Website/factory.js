@@ -215,8 +215,6 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
 
   snap.add(panel);
 
-  hide(controls.switchOff);
-
   var angle = 0;
   var count = 0;
   function animate() {
@@ -339,6 +337,29 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
       displayNumber(data.PrizeCountB, panel4.numberResultPurple);
       displayNumber(data.PrizeCountC, panel4.numberResultOrange);
     },
+    init: function init(data) {
+      // Bottom
+      hide(controls.switchOn);
+      show(controls.switchOff);
+      // Panel 1
+      hide(panel1.blueLight);
+      hide(panel1.redLight);
+      hide(panel1.greenLight);
+
+      // Panel 2
+      hide(panel2.yellowLight);
+      hide(panel2.positionCyan);
+      hide(panel2.positionOrange);
+      hide(panel2.positionPurple);
+
+      // Panel 3
+
+      // Panel 4
+      hide(panel4.greenLight);
+      hide(panel4.yellowLight);
+      hide(panel4.purpleLight);
+      hide(panel4.orangeLight);
+    },
     showLightWithTimeout: function showLightWithTimeout(data, name, el) {
       if (data[name]) {
         clearTimeout(this.timeouts[name]);
@@ -368,6 +389,6 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
     });
   }
 
-  display.updateData({});
+  display.init();
   loadData();
 });
