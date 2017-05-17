@@ -18,6 +18,10 @@ SdFat SD;
 File file;
 
 
+SYSTEM_MODE(MANUAL);
+//TODO: CANChannel using c4,c5 or D1,D2?
+//TODO: PMIC disableCharging
+
 using namespace cdam;
 
 Printer _printer = Printer();
@@ -49,6 +53,8 @@ void setup() {
 
 	//TODO: CAN-BUS PUBLISH COUNTS
 
+    PMIC power;
+    power.disableCharging();
 }
 
 void loop() {
