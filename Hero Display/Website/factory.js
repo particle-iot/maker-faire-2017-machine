@@ -281,7 +281,7 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
     return Promise.race([fetch(request), timeout(100)]).then(function (response) {
       return response.json();
     }).then(function (data) {
-      updateData(data);
+      display.updateData(data);
     }).then(reloadDataAfterInterval).catch(reloadDataAfterInterval);
   }
 
@@ -289,6 +289,14 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
     lightTimeout: 1000,
     timeouts: {},
     updateData: function updateData(data) {
+      // Bottom
+      if (data.MachineStart) {
+        show(controls.switchOn);
+        hide(controls.switchOff);
+      } else if (data.MachineStop) {
+        hide(controls.switchOn);
+        show(controls.switchOff);
+      }
       // Panel 1
       this.showLightWithTimeout(data, 'BlueButtonPressed', panel1.blueLight);
       this.showLightWithTimeout(data, 'RedButtonPressed', panel1.redLight);
