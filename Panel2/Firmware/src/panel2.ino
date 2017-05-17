@@ -51,13 +51,29 @@ struct Config {
   uint32_t ballCount;
   uint16_t ballPumpStartDelay;
   uint16_t ballPumpStopDelay;
+  uint16_t gateDelay;
+  uint16_t interactionTimeout;
+  uint16_t topServoOpenPos;
+  uint16_t topServoClosedPos;
+  uint16_t middleServoOpenPos;
+  uint16_t middleServoClosedPos;
+  uint16_t bottomServoOpenPos;
+  uint16_t bottomServoClosedPos;
 } config;
 
 Config defaultConfig = {
-  /* app */ APP_CODE('M', 'F', '2', 1), // increment last digit to reset EEPROM on boot
+  /* app */ APP_CODE('M', 'F', '2', 0), // increment last digit to reset EEPROM on boot
   /* ballCount */ 0,
   /* ballPumpStartDelay */ 500,
   /* ballPumpStopDelay */ 2000,
+  /* gateDelay */ 750,
+  /* interactionTimeout */ 5000,
+  /* topServoOpenPos */ 45,
+  /* topServoClosedPos */ 89,
+  /* middleServoOpenPos */ 45,
+  /* middleServoClosedPos */ 89,
+  /* bottomServoOpenPos */ 135,
+  /* bottomServoClosedPos */ 91,
 };
 
 Storage<Config> storage(defaultConfig);
@@ -85,10 +101,8 @@ void loop() {
   registerCloud();
   updateDetectors();
   updateColorSensor();
-  controlHopper();
   doPanelControl();
   controlBallPump();
-  controlTurbines();
   controlServos();
   printStatus();
   transmitComms();
@@ -135,13 +149,27 @@ void updateDetectors() {
 
 Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
 
+uint16_t red = 0;
+uint16_t green = 0;
+uint16_t blue = 0;
+uint16_t clear = 0;
+
+uint32_t colorSensorLastUpdate = 0;
+uint32_t colorSensorInterval = 100;
+
 void setupColorSensor() {
   tcs.begin();
   tcs.setInterrupt(false);
 }
 
 void updateColorSensor() {
-
+  auto now = millis();
+  if (now - colorSensorLastUpdate < colorSensorInterval) {
+    return;
+  }
+  colorSensorLastUpdate = now;
+  
+  tcs.getRawData(&red, &green, &blue, &clear);
 }
 
 /*
@@ -268,60 +296,73 @@ void controlServos() {
  */
 
 enum PanelState_e {
-  PANEL_IDLE,
-  PANEL_SELECT_TRACK,
-  PANEL_RUN_PUMP,
-  PANEL_WAIT,
-} panelState = PANEL_IDLE;
+  WAIT_FOR_COLOR_1,
+  COLOR_1_MATCHED,
+  WAIT_FOR_COLOR_2,
+  COLOR_2_MATCHED,
+  WAIT_FOR_COLOR_3,
+  COLOR_3_MATCHED
+} panelState = WAIT_FOR_COLOR_1;
 
-uint32_t trackSelectStartTime = 0;
-uint32_t ballPumpStartTime = 0;
-uint32_t waitStartTime = 0;
+uint32_t panelTime = 0;
+bool panelActive = false;
+uint16_t matchedColor = 0;
+#define ORANGE_HUE 35
+#define CYAN_HUE 180
+#define MAGENTA_HUE 300
 
 void doPanelControl() {
   auto now = millis();
 
   switch (panelState) {
-    case PANEL_IDLE:
-      if (redButtonPressed || greenButtonPressed || blueButtonPressed) {
-        panelState = PANEL_SELECT_TRACK;
-        trackSelectStartTime = now;
-        if (blueButtonPressed) {
-          trackSelectorState = TRACK_1;
-          runTurbines = true;
-        } else if (redButtonPressed) {
-          trackSelectorState = TRACK_2;
-        } else if (greenButtonPressed) {
-          trackSelectorState = TRACK_3;
-        }
+    case WAIT_FOR_COLOR_1:
+      // match orange
+      if (red > 2 * blue && green > blue) {
+        panelState = COLOR_1_MATCHED;
+        gatesState = TOP_GATE_OPEN;
+        matchedColor = ORANGE_HUE;
+        panelTime = now;
       }
       break;
-
-    case PANEL_SELECT_TRACK:
-      if (now - trackSelectStartTime > config.trackSelectTime) {
-        panelState = PANEL_RUN_PUMP;
-        ballPumpStartTime = now;
-        runBallPump = true;
+    case COLOR_1_MATCHED:
+      if (now - panelTime > config.gateDelay) {
+        panelState = WAIT_FOR_COLOR_2;
+        gatesState = ALL_GATES_CLOSED;
       }
       break;
-
-    case PANEL_RUN_PUMP:
-      if (now - ballPumpStartTime > config.ballPumpRunTime) {
-        panelState = PANEL_WAIT;
-        runBallPump = false;
+    case WAIT_FOR_COLOR_2:
+      // match cyan
+      if (blue > 2*red && green > red) {
+        panelState = COLOR_2_MATCHED;
+        gatesState = MIDDLE_GATE_OPEN;
+        matchedColor = CYAN_HUE;
+        panelTime = now;
       }
       break;
-
-    case PANEL_WAIT:
-      if (now - waitStartTime > config.waitTime) {
-        panelState = PANEL_IDLE;
+    case COLOR_2_MATCHED:
+      if (now - panelTime > config.gateDelay) {
+        panelState = WAIT_FOR_COLOR_3;
+        gatesState = ALL_GATES_CLOSED;
+      }
+      break;
+    case WAIT_FOR_COLOR_3:
+      // match magenta
+      if (red > green && blue > green) {
+        panelState = COLOR_3_MATCHED;
+        gatesState = BOTTOM_GATE_OPEN;
+        matchedColor = MAGENTA_HUE;
+        panelTime = now;
+      }
+      break;
+    case COLOR_3_MATCHED:
+      if (now - panelTime > config.gateDelay) {
+        panelState = WAIT_FOR_COLOR_1;
+        gatesState = ALL_GATES_CLOSED;
       }
       break;
   }
 
-  if (runTurbines && beamBroken1) {
-    runTurbines = false;
-  }
+  panelActive = now - panelTime < config.interactionTimeout;
 }
 
 /*
@@ -342,15 +383,9 @@ void receiveComms() {
 }
 
 void transmitComms() {
-  comms.Input2Active = false /* TODO */;
-  comms.RedButtonPressed = redButtonPressed;
-  comms.GreenButtonPressed = greenButtonPressed;
-  comms.BlueButtonPressed = blueButtonPressed;
-
-  comms.BallCount3 = ballCount1 + ballCount2 + ballCount3;
-  comms.RedBallCount = ballCount1;
-  comms.GreenBallCount = ballCount2;
-  comms.BlueBallCount = ballCount3;
+  comms.Input2Active = panelActive;
+  comms.InputColorHue = matchedColor;
+  comms.BallCount2 = ballCount;
 
   comms.transmit(MachineModules::Panel2);
 }
@@ -370,22 +405,19 @@ void printStatus() {
   printLastUpdate = now;
 
   Serial.printlnf(
-    "rgb=%d/%d/%d st=%d hop=%d pump=%d turb=%d servo=%d beams=%d/%d/%d/%d balls=%d/%d/%d",
-    redButtonPressed,
-    greenButtonPressed,
-    blueButtonPressed,
+    "rgb=%d/%d/%d st=%d pump=%d servos=%d/%d/%d beams=%d/%d balls=%d active=%d",
+    red,
+    green,
+    blue,
     panelState,
-    runHopper,
     runBallPump,
-    runTurbines,
-    servoPos,
-    beamBroken1,
-    beamBroken2,
-    beamBroken3,
+    topServoPos,
+    middleServoPos,
+    bottomServoPos,
+    beamBrokenTop,
     beamBrokenInput,
-    ballCount1,
-    ballCount2,
-    ballCount3
+    ballCount,
+    panelActive
   );
 }
 
@@ -420,6 +452,22 @@ int setConfigFromCloud(String arg) {
       config.ballPumpStartDelay = value.toInt();
     } else if (name.equals("ballPumpStopDelay")) {
       config.ballPumpStopDelay = value.toInt();
+    } else if (name.equals("gateDelay")) {
+      config.gateDelay = value.toInt();
+    } else if (name.equals("interactionTimeout")) {
+      config.interactionTimeout = value.toInt();
+    } else if (name.equals("topServoOpenPos")) {
+      config.topServoOpenPos = value.toInt();
+    } else if (name.equals("topServoClosedPos")) {
+      config.topServoClosedPos = value.toInt();
+    } else if (name.equals("middleServoOpenPos")) {
+      config.middleServoOpenPos = value.toInt();
+    } else if (name.equals("middleServoClosedPos")) {
+      config.middleServoClosedPos = value.toInt();
+    } else if (name.equals("bottomServoOpenPos")) {
+      config.bottomServoOpenPos = value.toInt();
+    } else if (name.equals("bottomServoClosedPos")) {
+      config.bottomServoClosedPos = value.toInt();
     } else {
       return -2;
     }
