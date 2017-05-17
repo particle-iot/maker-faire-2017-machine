@@ -368,5 +368,6 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
     });
   }
 
+  display.updateData();
   loadData();
 });
