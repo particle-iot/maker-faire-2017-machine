@@ -10,13 +10,13 @@ SYSTEM_THREAD(ENABLED);
 const auto PIXEL_TYPE = SK6812RGBW;
 
 const auto PIXEL_PIN_1 = A0;
-const auto PIXEL_COUNT_1 = 20;
+const auto PIXEL_COUNT_1 = 60;
 
 const auto PIXEL_PIN_2 = A1;
-const auto PIXEL_COUNT_2 = 20;
+const auto PIXEL_COUNT_2 = 60;
 
-const auto PIXEL_PIN_3 = A2;
-const auto PIXEL_COUNT_3 = 20;
+const auto PIXEL_PIN_3 = A3;
+const auto PIXEL_COUNT_3 = 60;
 
 Adafruit_NeoPixel strip1(PIXEL_COUNT_1, PIXEL_PIN_1, PIXEL_TYPE);
 Adafruit_NeoPixel strip2(PIXEL_COUNT_2, PIXEL_PIN_2, PIXEL_TYPE);
@@ -27,9 +27,9 @@ uint32_t color2;
 uint32_t color3;
 
 void setup() {
-  color1 = normalizeColor(strip1.Color(255, 0, 0));
-  color2 = normalizeColor(strip2.Color(0, 255, 0));
-  color3 = normalizeColor(strip2.Color(0, 0, 255));
+  color1 = normalizeColor(strip1.Color(0, 255, 0));
+  color2 = normalizeColor(strip2.Color(0, 0, 255));
+  color3 = normalizeColor(strip2.Color(255, 0, 0));
 
   strip1.begin();
   strip2.begin();
