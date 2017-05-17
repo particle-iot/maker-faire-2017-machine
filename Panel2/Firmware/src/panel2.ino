@@ -24,7 +24,8 @@ bool runMachine = AUTO_START;
  * Pin usage:
  */
 
-const auto CAN_BUS_PINS = CAN_D1_D2;
+/* Color sensor SDA D0 */
+/* Color sensor SCL D1 */
 const auto BALL_PUMP_PIN = D3;
 
 const auto LASER_ENABLE_PIN = A0;
@@ -33,6 +34,8 @@ const auto BALL_DETECTOR_INPUT_PIN = A2;
 const auto TOP_SERVO_PIN = A4;
 const auto BOTTOM_SERVO_PIN = A5;
 const auto MIDDLE_SERVO_PIN = WKP;
+
+const auto CAN_BUS_PINS = CAN_C4_C5;
 
 /*
  * CAN communication
@@ -46,11 +49,15 @@ Communication comms(can);
 struct Config {
   uint32_t app;
   uint32_t ballCount;
+  uint16_t ballPumpStartDelay;
+  uint16_t ballPumpStopDelay;
 } config;
 
 Config defaultConfig = {
   /* app */ APP_CODE('M', 'F', '2', 1), // increment last digit to reset EEPROM on boot
   /* ballCount */ 0,
+  /* ballPumpStartDelay */ 500,
+  /* ballPumpStopDelay */ 2000,
 };
 
 Storage<Config> storage(defaultConfig);
@@ -63,6 +70,7 @@ void setup() {
   Serial.begin();
   loadStorage();
   setupComms();
+  setupColorSensor();
   setupBallPump();
   setupDetectors();
   setupServos();
@@ -76,7 +84,7 @@ void loop() {
   receiveComms();
   registerCloud();
   updateDetectors();
-  updateButtons();
+  updateColorSensor();
   controlHopper();
   doPanelControl();
   controlBallPump();
@@ -122,6 +130,21 @@ void updateDetectors() {
 }
 
 /*
+ * Color sensor
+ */
+
+Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
+
+void setupColorSensor() {
+  tcs.begin();
+  tcs.setInterrupt(false);
+}
+
+void updateColorSensor() {
+
+}
+
+/*
  * Ball pump
  */
 
@@ -130,41 +153,22 @@ const auto BALL_PUMP_STOP = LOW;
 
 bool runBallPump = false;
 
+enum BallPumpState_e {
+  BALL_PUMP_IDLE,
+  BALL_PUMP_RUNNING
+} ballPumpState = BALL_PUMP_IDLE;
+
+uint32_t lastInputDetectionTime = 0;
+uint32_t lastInputGapTime = 0;
+uint32_t ballPumpStartTime = 0;
+
 void setupBallPump() {
   pinMode(BALL_PUMP_PIN, OUTPUT);
   digitalWrite(BALL_PUMP_PIN, BALL_PUMP_STOP);
 }
 
 void controlBallPump() {
-  digitalWrite(BALL_PUMP_PIN, runMachine && runBallPump ? BALL_PUMP_RUN : BALL_PUMP_STOP);
-}
-
-/*
- * Ball hopper
- */
-
-const auto HOPPER_STOP = LOW;
-const auto HOPPER_RUN = HIGH;
-
-bool runHopper = false;
-
-enum HopperState_e {
-  HOPPER_IDLE,
-  HOPPER_RUNNING,
-  HOPPER_TIMEOUT
-} hopperState = HOPPER_IDLE;
-
-uint32_t lastInputDetectionTime = 0;
-uint32_t lastInputGapTime = 0;
-uint32_t hopperStartTime = 0;
-
-void setupHopper() {
-  pinMode(HOPPER_PIN, OUTPUT);
-  digitalWrite(HOPPER_PIN, HOPPER_STOP);
-}
-
-void controlHopper() {
-  // Run the hopper when there's no ball in front of the detector for a while
+  // Run the ball pump when there's no ball in front of the detector for a while
   auto now = millis();
   if (beamBrokenInput) {
     lastInputDetectionTime = now;
@@ -172,74 +176,90 @@ void controlHopper() {
     lastInputGapTime = now;
   }
 
-  switch (hopperState) {
-    case HOPPER_IDLE:
-      if (now - lastInputDetectionTime > config.hopperStartDelay) {
-        hopperState = HOPPER_RUNNING;
-        hopperStartTime = now;
-        runHopper = true;
+  switch (ballPumpState) {
+    case BALL_PUMP_IDLE:
+      if (now - lastInputDetectionTime > config.ballPumpStartDelay) {
+        ballPumpState = BALL_PUMP_RUNNING;
+        ballPumpStartTime = now;
+        runBallPump = true;
       }
       break;
-    case HOPPER_RUNNING:
-      if (beamBrokenInput && now - lastInputGapTime > config.hopperStopDelay) {
-        hopperState = HOPPER_IDLE;
-        runHopper = false;
-      //} else if (now - hopperStartTime > config.hopperMaxRunTime) {
-      //  hopperState = HOPPER_TIMEOUT;
+    case BALL_PUMP_RUNNING:
+      if (beamBrokenInput && now - lastInputGapTime > config.ballPumpStopDelay) {
+        ballPumpState = BALL_PUMP_IDLE;
+        runBallPump = false;
       }
       break;
-
-    // FIXME: timeout was meant for case where the input is full but the
-    // beam is not broken. Disabled because there's no good way to get
-    // out of a timeout
-    //case HOPPER_TIMEOUT:
-    //  if (beamBrokenInput) {
-    //    hopperState = HOPPER_IDLE;
-    //  }
-    //  break;
   }
 
-  digitalWrite(HOPPER_PIN, runMachine && runHopper ? HOPPER_RUN : HOPPER_STOP);
+  digitalWrite(BALL_PUMP_PIN, runMachine && runBallPump ? BALL_PUMP_RUN : BALL_PUMP_STOP);
 }
 
 /*
- * Servos
+ * Servo gates
  */
-Servo servo;
 
-uint8_t servoPos = 0;
+enum GatesState_e {
+  ALL_GATES_CLOSED,
+  TOP_GATE_OPEN,
+  MIDDLE_GATE_OPEN,
+  BOTTOM_GATE_OPEN
+} gatesState = ALL_GATES_CLOSED;
+
+Servo topServo;
+Servo middleServo;
+Servo bottomServo;
+
+uint8_t topServoPos = 0;
+uint8_t middleServoPos = 0;
+uint8_t bottomServoPos = 0;
 bool autoServo = true;
 
-enum TrackSelectorState_e {
-  TRACK_1,
-  TRACK_2,
-  TRACK_3
-} trackSelectorState = TRACK_1;
-
 void setupServos() {
-  servoPos = config.servoPos1;
-  servo.attach(SERVO_PIN);
-  servo.write(servoPos);
+  topServoPos = config.topServoClosedPos;
+  middleServoPos = config.middleServoClosedPos;
+  bottomServoPos = config.bottomServoClosedPos;
+
+  topServo.attach(TOP_SERVO_PIN);
+  middleServo.attach(MIDDLE_SERVO_PIN);
+  bottomServo.attach(BOTTOM_SERVO_PIN);
+
+  topServo.write(topServoPos);
+  middleServo.write(middleServoPos);
+  bottomServo.write(bottomServoPos);
 }
 
 void controlServos() {
   // Update the position of the servo from the desired active track
   if (autoServo) {
-    switch (trackSelectorState) {
-      case TRACK_1:
-        servoPos = config.servoPos1;
+    switch (gatesState) {
+      case ALL_GATES_CLOSED:
+        topServoPos = config.topServoClosedPos;
+        middleServoPos = config.middleServoClosedPos;
+        bottomServoPos = config.bottomServoClosedPos;
         break;
-      case TRACK_2:
-        servoPos = config.servoPos2;
+      case TOP_GATE_OPEN:
+        topServoPos = config.topServoOpenPos;
+        middleServoPos = config.middleServoClosedPos;
+        bottomServoPos = config.bottomServoClosedPos;
         break;
-      case TRACK_3:
-        servoPos = config.servoPos3;
+      case MIDDLE_GATE_OPEN:
+        topServoPos = config.topServoOpenPos;
+        middleServoPos = config.middleServoOpenPos;
+        bottomServoPos = config.bottomServoClosedPos;
+        break;
+      case BOTTOM_GATE_OPEN:
+        topServoPos = config.topServoOpenPos;
+        middleServoPos = config.middleServoOpenPos;
+        bottomServoPos = config.bottomServoOpenPos;
         break;
     }
   }
 
   if (runMachine) {
-    servo.write(servoPos);
+    topServo.write(topServoPos);
+    middleServo.write(middleServoPos);
+    bottomServo.write(bottomServoPos);
   }
 }
 
@@ -322,7 +342,7 @@ void receiveComms() {
 }
 
 void transmitComms() {
-  comms.Input1Active = redButtonPressed || greenButtonPressed || blueButtonPressed;
+  comms.Input2Active = false /* TODO */;
   comms.RedButtonPressed = redButtonPressed;
   comms.GreenButtonPressed = greenButtonPressed;
   comms.BlueButtonPressed = blueButtonPressed;
@@ -332,7 +352,7 @@ void transmitComms() {
   comms.GreenBallCount = ballCount2;
   comms.BlueBallCount = ballCount3;
 
-  comms.transmit(MachineModules::Panel1);
+  comms.transmit(MachineModules::Panel2);
 }
 
 /*
@@ -377,10 +397,10 @@ void registerCloud() {
   if (!registered && Particle.connected()) {
     registered = true;
     Particle.function("set", setConfigFromCloud);
-    Particle.function("servo", overrideServoPos);
+    Particle.function("servo1", overrideServo1Pos);
+    Particle.function("servo2", overrideServo2Pos);
+    Particle.function("servo3", overrideServo3Pos);
     Particle.function("pump", overrideBallPump);
-    Particle.function("hopper", overrideHopper);
-    Particle.function("turbines", overrideTurbines);
   }
 }
 
@@ -393,33 +413,13 @@ int setConfigFromCloud(String arg) {
     String name = arg.substring(0, equalPos);
     String value = arg.substring(equalPos + 1);
 
-    if (name.equals("ballCount1")) {
-      config.ballCount1 = value.toInt();
-      ballCount1 = config.ballCount1;
-    } else if (name.equals("ballCount2")) {
-      config.ballCount2 = value.toInt();
-      ballCount2 = config.ballCount2;
-    } else if (name.equals("ballCount3")) {
-      config.ballCount3 = value.toInt();
-      ballCount3 = config.ballCount3;
-    } else if (name.equals("servoPos1")) {
-      config.servoPos1 = value.toInt();
-    } else if (name.equals("servoPos2")) {
-      config.servoPos2 = value.toInt();
-    } else if (name.equals("servoPos3")) {
-      config.servoPos3 = value.toInt();
-    } else if (name.equals("trackSelectTime")) {
-      config.trackSelectTime = value.toInt();
-    } else if (name.equals("ballPumpRunTime")) {
-      config.ballPumpRunTime = value.toInt();
-    } else if (name.equals("hopperStartDelay")) {
-      config.hopperStartDelay = value.toInt();
-    } else if (name.equals("hopperStopDelay")) {
-      config.hopperStopDelay = value.toInt();
-    } else if (name.equals("hopperMaxRunTime")) {
-      config.hopperMaxRunTime = value.toInt();
-    } else if (name.equals("waitTime")) {
-      config.waitTime = value.toInt();
+    if (name.equals("ballCount")) {
+      config.ballCount = value.toInt();
+      ballCount = config.ballCount;
+    } else if (name.equals("ballPumpStartDelay")) {
+      config.ballPumpStartDelay = value.toInt();
+    } else if (name.equals("ballPumpStopDelay")) {
+      config.ballPumpStopDelay = value.toInt();
     } else {
       return -2;
     }
@@ -428,24 +428,26 @@ int setConfigFromCloud(String arg) {
     return 0;
 }
 
-int overrideServoPos(String arg) {
-  servoPos = arg.toInt();
+int overrideServo1Pos(String arg) {
+  topServoPos = arg.toInt();
+  autoServo = false;
+  return 0;
+}
+
+int overrideServo2Pos(String arg) {
+  middleServoPos = arg.toInt();
+  autoServo = false;
+  return 0;
+}
+
+int overrideServo3Pos(String arg) {
+  bottomServoPos = arg.toInt();
   autoServo = false;
   return 0;
 }
 
 int overrideBallPump(String arg) {
   runBallPump = arg.toInt();
-  return 0;
-}
-
-int overrideHopper(String arg) {
-  runHopper = arg.toInt();
-  return 0;
-}
-
-int overrideTurbines(String arg) {
-  runTurbines = arg.toInt();
   return 0;
 }
 
@@ -460,16 +462,8 @@ void loadStorage() {
 // Write ball count to EEPROM every N balls
 void storeBallCount() {
   static const auto STORE_BALLS_DELTA = 20;
-  if (ballCount1 - config.ballCount1 >= STORE_BALLS_DELTA) {
-    config.ballCount1 = ballCount1;
-    storage.store(config);
-  }
-  if (ballCount2 - config.ballCount2 >= STORE_BALLS_DELTA) {
-    config.ballCount2 = ballCount2;
-    storage.store(config);
-  }
-  if (ballCount3 - config.ballCount3 >= STORE_BALLS_DELTA) {
-    config.ballCount3 = ballCount3;
+  if (ballCount - config.ballCount >= STORE_BALLS_DELTA) {
+    config.ballCount = ballCount;
     storage.store(config);
   }
 }
