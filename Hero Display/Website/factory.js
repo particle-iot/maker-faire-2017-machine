@@ -116,9 +116,21 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
   }
 
   function displayNumber(number, segmentsArray) {
+    number = number || 0;
     displayDigit(Math.floor(number / 100) % 10, segmentsArray[0]);
     displayDigit(Math.floor(number / 10) % 10, segmentsArray[1]);
     displayDigit(number % 10, segmentsArray[2]);
+  }
+
+  function rotatePointer(angle, pointer) {
+    angle = angle || 0;
+    if (!pointer.originalBBox) {
+      pointer.originalBBox = pointer.getBBox();
+    }
+    var bb = pointer.originalBBox;
+    var matrix = new Snap.Matrix(1,0,0,1,0,0);
+    matrix.rotate(angle, bb.x2-10, bb.y+10);
+    pointer.attr({ transform: matrix });
   }
 
   var panel = s('#panel');
@@ -132,7 +144,7 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
     redLight: s('#g3696'),
     redNumbers: [
       sevenSegment('#g3432', '#g3420', '#g3436', '#g3444', '#g3424', '#g3440', '#g3428'),
-      sevenSegment('#g3460', '#g3448', '#g3464', '#g3472', '#g3452', '#g3468', '#g3484'),
+      sevenSegment('#g3460', '#g3448', '#g3464', '#g3472', '#g3452', '#g3468', '#g3456'),
       sevenSegment('#g3488', '#g3476', '#g3492', '#g3500', '#g3480', '#g3496', '#g3484')
     ],
     blueLight: s('#g3708'),
@@ -150,13 +162,14 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
       sevenSegment('#g3628', '#g3616', '#g3632', '#g3640', '#g3620', '#g3636', '#g3624'),
       sevenSegment('#g3656', '#g3644', '#g3660', '#g3668', '#g3648', '#g3664', '#g3652')
     ],
-    positionYellow: s('#g3720'),
+    positionCyan: s('#g3720'),
     positionOrange: s('#g3753'),
     positionPurple: s('#g3786')
   };
 
   var panel3 = {
     pointer: s('#path3819'),
+    pointerMaxAngle: 285,
     numberIntegration1: [
       sevenSegment('#g3833', '#g3821', '#g3837', '#g3845', '#g3825', '#g3841', '#g3829'),
       sevenSegment('#g3861', '#g3849', '#g3865', '#g3873', '#g3853', '#g3869', '#g3857'),
@@ -176,17 +189,20 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
 
   var panel4 = {
     greenLight: s('#g4073'),
-    numberResult1: [
+    yellowLight: s('#g4365'),
+    purpleLight: s('#g4375'),
+    orangeLight: s('#g4383'),
+    numberResultYellow: [
       sevenSegment('#g4109', '#g4097', '#g4113', '#g4121', '#g4101', '#g4117', '#g4105'),
       sevenSegment('#g4139', '#g4127', '#g4143', '#g4151', '#g4131', '#g4147', '#g4135'),
       sevenSegment('#g4169', '#g4157', '#g4173', '#g4181', '#g4161', '#g4177', '#g4165')
     ],
-    numberResult2: [
+    numberResultPurple: [
       sevenSegment('#g4199', '#g4187', '#g4203', '#g4211', '#g4191', '#g4207', '#g4195'),
       sevenSegment('#g4229', '#g4217', '#g4233', '#g4241', '#g4221', '#g4237', '#g4225'),
       sevenSegment('#g4259', '#g4247', '#g4263', '#g4271', '#g4251', '#g4267', '#g4255')
     ],
-    numberResult3: [
+    numberResultOrange: [
       sevenSegment('#g4289', '#g4277', '#g4293', '#g4301', '#g4281', '#g4297', '#g4285'),
       sevenSegment('#g4319', '#g4307', '#g4323', '#g4331', '#g4311', '#g4327', '#g4315'),
       sevenSegment('#g4349', '#g4337', '#g4353', '#g4361', '#g4341', '#g4357', '#g4345')
@@ -201,18 +217,17 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
 
   hide(controls.switchOff);
 
-  var bb = panel3.pointer.getBBox();
   var angle = 0;
-  setInterval(function () {
-    angle++;
-    var matrix = new Snap.Matrix(1,0,0,1,0,0);
-    matrix.rotate(angle, bb.x2-10, bb.y+10);
-    panel3.pointer.attr({ transform: matrix });
-  }, 10);
-
   var count = 0;
-  setInterval(function () {
-    count++;
+  function animate() {
+    angle++;
+    if (angle > maxAngle * 2) {
+      angle = 0;
+    }
+    var maxAngle = panel3.pointerMaxAngle;
+    rotatePointer(angle > maxAngle ? 2 * maxAngle - angle : angle, panel3.pointer);
+
+    count = count + 111;
     displayNumber(count, panel1.greenNumbers);
     displayNumber(count, panel1.redNumbers);
     displayNumber(count, panel1.blueNumbers);
@@ -223,15 +238,15 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
     displayNumber(count, panel2.yellowNumbers);
     var pos = (count % 60);
     if (pos < 20) {
-      show(panel2.positionYellow);
+      show(panel2.positionCyan);
       hide(panel2.positionOrange);
       hide(panel2.positionPurple);
     } else if(pos < 40) {
-      hide(panel2.positionYellow);
+      hide(panel2.positionCyan);
       show(panel2.positionOrange);
       hide(panel2.positionPurple);
     } else {
-      hide(panel2.positionYellow);
+      hide(panel2.positionCyan);
       hide(panel2.positionOrange);
       show(panel2.positionPurple);
     }
@@ -241,11 +256,18 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
     displayNumber(count, panel3.numberIntegration2);
     displayNumber(count, panel3.numberIntegration3);
 
-    displayNumber(count, panel4.numberResult1);
-    displayNumber(count, panel4.numberResult2);
-    displayNumber(count, panel4.numberResult3);
+    displayNumber(count, panel4.numberResultYellow);
+    displayNumber(count, panel4.numberResultPurple);
+    displayNumber(count, panel4.numberResultOrange);
     display(panel4.greenLight, (count + 60) % 91 < 50);
-  }, 10);
+    display(panel4.yellowLight, (count + 40) % 71 < 25);
+    display(panel4.purpleLight, (count + 30) % 41 < 20);
+    display(panel4.orangeLight, (count + 50) % 81 < 40);
+  }
+  //document.getElementsByTagName('body')[0].addEventListener('keyup', function (e) {
+  //  animate();
+  //});
+  //setInterval(animmate, 10);
 
   function loadData() {
     var headers = new Headers();
@@ -263,13 +285,62 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
     }).then(reloadDataAfterInterval).catch(reloadDataAfterInterval);
   }
 
-  var ballCount = -1;
-  function updateData(data) {
-    if (data.BallCount1 != ballCount) {
-      ballCount = data.BallCount1;
-      events.attr({ text: ballCount + ' events published' });
-    }
-  }
+  var display = {
+    lightTimeout: 1000,
+    timeouts: {},
+    updateData: function updateData(data) {
+      // Panel 1
+      this.showLightWithTimeout(data, 'BlueButtonPressed', panel1.blueLight);
+      this.showLightWithTimeout(data, 'RedButtonPressed', panel1.redLight);
+      this.showLightWithTimeout(data, 'GreenButtonPressed', panel1.greenLight);
+      displayNumber(data.BlueBallCount, panel1.blueNumbers);
+      displayNumber(data.RedBallCount, panel1.redNumbers);
+      displayNumber(data.GreenBallCount, panel1.greenNumbers);
+
+      // Panel 2
+      this.showLightWithTimeout(data, 'Input2Active', panel2.yellowLight);
+      displayNumber(data.BallCount2, panel2.yellowNumbers);
+      if (data.InputColorHue < 30) {
+        hide(panel2.positionCyan);
+        show(panel2.positionOrange);
+        hide(panel2.positionPurple);
+      } else if(data.InputColorHue > 200) {
+        hide(panel2.positionCyan);
+        hide(panel2.positionOrange);
+        show(panel2.positionPurple);
+      } else {
+        show(panel2.positionCyan);
+        hide(panel2.positionOrange);
+        hide(panel2.positionPurple);
+      }
+
+      // Panel 3
+      var pointerRatio = 4.0;
+      var pointerAngle = Math.min((data.InputCrankSpeed || 0) / pointerRatio, pointerRatio) * panel3.pointerMaxAngle;
+      rotatePointer(pointerAngle, panel3.pointer);
+      displayNumber(data.IntegrationCountA, panel3.numberIntegration1);
+      displayNumber(data.IntegrationCountB, panel3.numberIntegration2);
+      displayNumber(data.IntegrationCountC, panel3.numberIntegration3);
+
+      // Panel 4
+      this.showLightWithTimeout(data, 'Input4Active', panel4.greenLight);
+      this.showLightWithTimeout(data, 'PrintingPrizeA', panel4.yellowLight);
+      this.showLightWithTimeout(data, 'PrintingPrizeB', panel4.purpleLight);
+      this.showLightWithTimeout(data, 'PrintingPrizeC', panel4.orangeLight);
+      displayNumber(data.PrizeCountA, panel4.numberResultYellow);
+      displayNumber(data.PrizeCountB, panel4.numberResultPurple);
+      displayNumber(data.PrizeCountC, panel4.numberResultOrange);
+    },
+    showLightWithTimeout: function showLightWithTimeout(data, name, el) {
+      if (data[name]) {
+        clearTimeout(this.timeouts[name]);
+        show(el);
+        this.timeouts[name] = setTimeout(function () {
+          hide(el);
+        }, this.lightTimeout);
+      }
+    },
+  };
 
   function reloadDataAfterInterval() {
     return delay(250).then(function () {
@@ -289,5 +360,5 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
     });
   }
 
-  //loadData();
+  loadData();
 });

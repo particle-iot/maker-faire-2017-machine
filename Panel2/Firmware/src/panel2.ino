@@ -307,9 +307,9 @@ enum PanelState_e {
 uint32_t panelTime = 0;
 bool panelActive = false;
 uint16_t matchedColor = 0;
-#define ORANGE_HUE 35
-#define CYAN_HUE 180
-#define MAGENTA_HUE 300
+#define ORANGE_HUE 25
+#define CYAN_HUE 128
+#define MAGENTA_HUE 213
 
 void doPanelControl() {
   auto now = millis();
