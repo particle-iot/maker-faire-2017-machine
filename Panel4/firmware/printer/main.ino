@@ -8,10 +8,14 @@ SYSTEM_THREAD(ENABLED);
 #include "cdam_const_config.h"
 #define kIntervalPrinterMillis 100
 
+#include "bitset.h"
+
 #define PRINT_DELAY 1000
 unsigned long lastPrintTime = 0;
 
-int counters[4] = {0,0,0,0};
+#define CAN_PRINT_MESSAGE_ID 0x204
+
+//int counters[4] = {0,0,0,0};
 
 #define CS_PIN SS
 SdFat SD;
@@ -19,8 +23,8 @@ File file;
 
 
 SYSTEM_MODE(MANUAL);
-//TODO: CANChannel using c4,c5 or D1,D2?
-//TODO: PMIC disableCharging
+CANChannel can(CAN_D1_D2);
+
 
 using namespace cdam;
 
@@ -45,76 +49,101 @@ void setup() {
         Particle.publish("printer", "sd card init failed");
       }
 
-    // buttons
-    pinMode(D1, INPUT);
-  	pinMode(D2, INPUT);
-	pinMode(D3, INPUT);
-	pinMode(D4, INPUT);
+//    // buttons
+//  pinMode(D1, INPUT);
+//  pinMode(D2, INPUT);
+//	pinMode(D3, INPUT);
+//	pinMode(D4, INPUT);
 
 	//TODO: CAN-BUS PUBLISH COUNTS
+
+    can.begin(100000);
 
     PMIC power;
     power.disableCharging();
 }
 
 void loop() {
-    unsigned long now = millis();
+    //unsigned long now = millis();
 
-    checkButtons();
+    checkCAN();
+
+    //checkButtons();
 }
 
-void checkButtons() {
-    int buttonDownValue = LOW;
-
-    bool buttonOne = digitalRead(D1) == buttonDownValue;
-    bool buttonTwo = digitalRead(D2) == buttonDownValue;
-    bool buttonThree = digitalRead(D3) == buttonDownValue;
-    bool buttonFour = digitalRead(D4) == buttonDownValue;
-
-    int imageNumber = -1;
-
-    if (buttonOne) {
-        imageNumber = 1;
-        counters[0]++;
-    }
-    else if (buttonTwo) {
-        imageNumber = 2;
-        counters[1]++;
-    }
-    else if (buttonThree) {
-        imageNumber = 3;
-        counters[2]++;
-    }
-    else if (buttonFour) {
-        //imageNumber = 99;
-        counters[3]++;
+void checkCAN() {
+    if(can.available() <= 0) {
+        return;
     }
 
-    unsigned long now = millis();
+    // we have messages
 
-    if ((imageNumber >= 0) && ((now - lastPrintTime) > PRINT_DELAY)) {
-        lastPrintTime = now;
+    CANMessage msg;
+    if(!can.receive(msg)) {
+        // there was a problem getting the message!
+        return;
+    }
 
-        if (imageNumber >= 0) {
-//            Serial.println("the time is " + String(millis()));
-//            Serial.println("pin D1 is " + (digitalRead(D1) ? String("HIGH") : String("LOW")));
-//            Serial.println("pin D2 is " + (digitalRead(D2) ? String("HIGH") : String("LOW")));
-//            Serial.println("pin D3 is " + (digitalRead(D3) ? String("HIGH") : String("LOW")));
-//            Serial.println("pin D4 is " + (digitalRead(D4) ? String("HIGH") : String("LOW")));
-//
-////            Serial.println("analog D1 is " + String(analogRead(D1)));
-////            Serial.println("analog D2 is " + String(analogRead(D2)));
-////            Serial.println("analog D3 is " + String(analogRead(D3)));
-////            Serial.println("analog D4 is " + String(analogRead(D4)));
-//
+    Serial.println(String::format("CAN Msg: %d, Length: %d ", msg.id, msg.len));
 
-            Serial.println("Printing image " + String(imageNumber));
+//    // every time we get message id 100, lets blink our LED.
+//    if (msg.id == 0x100) {
+//        led_state = !led_state;
+//        digitalWrite(D7, (led_state) ? HIGH:LOW);
+//    }
 
-            //printImageFile(190, 190, "particle_logo.raw");
-            printImage(imageNumber);
+    // todo: drop other pending prints?
+
+    if (msg.id == CAN_PRINT_MESSAGE_ID) {
+        // got a print command
+        int index = getU8(msg.data, 0);
+        if (index > 0) {
+            Serial.println("Printing image " + String(index));
+            printImage(index);
         }
     }
 }
+
+//void checkButtons() {
+//    int buttonDownValue = LOW;
+//
+//    bool buttonOne = digitalRead(D1) == buttonDownValue;
+//    bool buttonTwo = digitalRead(D2) == buttonDownValue;
+//    bool buttonThree = digitalRead(D3) == buttonDownValue;
+//    bool buttonFour = digitalRead(D4) == buttonDownValue;
+//
+//    int imageNumber = -1;
+//
+//    if (buttonOne) {
+//        imageNumber = 1;
+//        counters[0]++;
+//    }
+//    else if (buttonTwo) {
+//        imageNumber = 2;
+//        counters[1]++;
+//    }
+//    else if (buttonThree) {
+//        imageNumber = 3;
+//        counters[2]++;
+//    }
+//    else if (buttonFour) {
+//        //imageNumber = 99;
+//        counters[3]++;
+//    }
+//
+//    unsigned long now = millis();
+//
+//    if ((imageNumber >= 0) && ((now - lastPrintTime) > PRINT_DELAY)) {
+//        lastPrintTime = now;
+//
+//        if (imageNumber >= 0) {
+//            Serial.println("Printing image " + String(imageNumber));
+//
+//            //printImageFile(190, 190, "particle_logo.raw");
+//            printImage(imageNumber);
+//        }
+//    }
+//}
 
 
 void printImage(int imageNumber) {
