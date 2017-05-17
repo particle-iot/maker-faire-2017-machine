@@ -86,20 +86,30 @@ void exportDataToJSON() {
   JSON_SIGNAL_INT(MachineStart);
   JSON_SIGNAL_INT(MachineStop);
   JSON_SIGNAL_INT(Input1Active);
-  JSON_SIGNAL_INT(BallCount1);
   JSON_SIGNAL_INT(GreenButtonPressed);
   JSON_SIGNAL_INT(BlueButtonPressed);
   JSON_SIGNAL_INT(RedButtonPressed);
+  JSON_SIGNAL_INT(RedBallCount);
+  JSON_SIGNAL_INT(BlueBallCount);
+  JSON_SIGNAL_INT(GreenBallCount);
   JSON_SIGNAL_INT(Input2Active);
   JSON_SIGNAL_INT(BallCount2);
   JSON_SIGNAL_INT(InputColorHue);
   JSON_SIGNAL_INT(Input3Active);
-  JSON_SIGNAL_INT(BallCount3);
   JSON_SIGNAL_FLOAT(InputCrankSpeed);
+  JSON_SIGNAL_INT(IntegrationCountA);
+  JSON_SIGNAL_INT(IntegrationCountB);
+  JSON_SIGNAL_INT(IntegrationCountC);
   JSON_SIGNAL_INT(Input4Active);
   JSON_SIGNAL_INT(BallCount4);
   JSON_SIGNAL_INT(HoverPositionLR);
   JSON_SIGNAL_INT(HoverPositionUD);
+  JSON_SIGNAL_INT(PrintingPrizeA);
+  JSON_SIGNAL_INT(PrintingPrizeB);
+  JSON_SIGNAL_INT(PrintingPrizeC);
+  JSON_SIGNAL_INT(PrizeCountA);
+  JSON_SIGNAL_INT(PrizeCountB);
+  JSON_SIGNAL_INT(PrizeCountC);
   JSON_SIGNAL_INT(LightsActive);
   // Shows if the firmware is running, and terminates the JSON properly
   // (trailing commas are not allowed in JSON...)
