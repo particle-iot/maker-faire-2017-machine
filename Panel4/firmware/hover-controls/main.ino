@@ -2,16 +2,17 @@
 
 #define STEP_CLOCK_DURATION 1
 
-#define STEPPER_DIRECTION_PIN A5
-#define STEPPER_STEP_PIN A4
-#define STEPPER_EN_PIN A3
-
 #define BUMP_BTN_PIN1 A0
 #define BUMP_BTN_PIN2 A1
+#define STEPPER_EN_PIN A3
+#define STEPPER_STEP_PIN A4
+#define STEPPER_DIRECTION_PIN A5
 
-//TODO: What are these really?
-#define BALL_PUMP_PIN D5
-#define BALLS_FULL_PIN D6
+#define HOVER_TS_PIN D4
+#define HOVER_RST_PIN D5
+
+#define BALL_PUMP_PIN B0
+#define BALLS_FULL_PIN B0
 
 #define STEPPER_DIRECTION_LEFT LOW
 #define STEPPER_DIRECTION_RIGHT HIGH
@@ -38,8 +39,6 @@ Timer bumperChecker(50, bumperCallback);
 //  Hover Stuff
 //
 
-#define HOVER_TS_PIN D2
-#define HOVER_RST_PIN D3
 
 #define GESTUREMODE 0x00    //0x00 = disable gestures, 0x01 = enable gestures
 #define TOUCHMODE 0x00      //0x00 = disable touch, 0x01 = enable touch
@@ -56,6 +55,8 @@ bool state = false;
 #define DISPENSE_BALL_DURATION 3000
 bool dispensingBall = false;
 unsigned long startedDispensingBallTime = 0;
+
+SYSTEM_MODE(MANUAL);
 
 /*
     How to wire it up!
@@ -99,6 +100,9 @@ void setup() {
 
     // run me forever
     bumperChecker.start();
+
+    PMIC power;
+    power.disableCharging();
 }
 
 void loop() {
@@ -141,7 +145,6 @@ void hoverTick() {
         return;
     }
 
-    lastHoverCheck = now;
 
     Position p = hover.getPosition();
     if (p.x==0 && p.y==0 && p.x==0) {
@@ -179,15 +182,19 @@ void hoverTick() {
 
     // TODO: slow vs. fast regions?
 
-    Serial.println(String::format("(%d, %d, %d) direction %s ", p.x, p.y, p.z, dir));
-
+    // don't print to serial as much, it's expensive
+    if ((now - lastHoverCheck) < 250) {
+        Serial.println(String::format("(%d, %d, %d) direction %s ", p.x, p.y, p.z, dir));
+    }
     Touch t = hover.getTouch();
     if ( t.touchID != 0) {
-        //         Serial.print("Event: "); Serial.print(t.touchType); Serial.print("\t");
-        //         Serial.print("Touch ID: "); Serial.print(t.touchID,HEX); Serial.print("\t");
-        //         Serial.print("Value: "); Serial.print(t.touchValue,HEX); Serial.println("");
+        Serial.print("Touch Event: "); Serial.print(t.touchType); Serial.print("\t");
+        Serial.print("Touch ID: "); Serial.print(t.touchID,HEX); Serial.print("\t");
+        Serial.print("Value: "); Serial.print(t.touchValue,HEX); Serial.println("");
         dispenseBall();
     }
+
+    lastHoverCheck = now;
 }
 
 void dispenseBallTick() {
@@ -204,11 +211,15 @@ void dispenseBallTick() {
     else {
         // putting this here so we don't chain dispense'es
         if (digitalRead(BALLS_FULL_PIN) == HIGH) {
+            //Serial.println("Balls full pin is high");
             dispenseBall();
         }
     }
 }
 
+/**
+    Kicks off a ball being dispensed.
+*/
 void dispenseBall() {
     dispensingBall = true;
     startedDispensingBallTime = millis();
