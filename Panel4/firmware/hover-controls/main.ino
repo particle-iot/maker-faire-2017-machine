@@ -1,4 +1,5 @@
 #include "Hover.h"
+#include "bitset.h"
 
 #define STEP_CLOCK_DURATION 1
 
@@ -7,6 +8,10 @@
 #define STEPPER_EN_PIN A3
 #define STEPPER_STEP_PIN A4
 #define STEPPER_DIRECTION_PIN A5
+
+#define LASER_GATE1 D1
+#define LASER_GATE2 D2
+#define LASER_GATE3 D3
 
 #define HOVER_TS_PIN D4
 #define HOVER_RST_PIN D5
@@ -58,6 +63,16 @@ unsigned long startedDispensingBallTime = 0;
 
 SYSTEM_MODE(MANUAL);
 
+CANChannel can(CAN_C4_C5);
+#define CAN_PRINT_MESSAGE_ID 0x204
+
+
+// laser gate stuff
+#define PRINT_DELAY 1000
+int counters[4] = {0,0,0,0};
+unsigned long lastPrintTime = 0;
+
+
 /*
     How to wire it up!
 
@@ -92,6 +107,11 @@ void setup() {
     pinMode(BALL_PUMP_PIN, OUTPUT);
     pinMode(BALLS_FULL_PIN, INPUT);
 
+
+    pinMode(LASER_GATE1, INPUT);
+    pinMode(LASER_GATE2, INPUT);
+    pinMode(LASER_GATE3, INPUT);
+
     pinMode(D7, OUTPUT);
 
     //Initialize default states
@@ -110,8 +130,53 @@ void loop() {
     // bool blink_state = false;
     hoverTick();
 
+    checkLaserGates();
+
     dispenseBallTick();
 }
+
+
+void checkLaserGates() {
+    int buttonDownValue = LOW;
+
+    bool buttonOne = digitalRead(LASER_GATE1) == buttonDownValue;
+    bool buttonTwo = digitalRead(LASER_GATE2) == buttonDownValue;
+    bool buttonThree = digitalRead(LASER_GATE3) == buttonDownValue;
+
+    int imageNumber = -1;
+
+    //
+    //  Count the balls
+    //
+
+    if (buttonOne) {
+        imageNumber = 1;
+        counters[0]++;
+    }
+    else if (buttonTwo) {
+        imageNumber = 2;
+        counters[1]++;
+    }
+    else if (buttonThree) {
+        imageNumber = 3;
+        counters[2]++;
+    }
+
+    //
+    //  If enough time has passed (print the images)
+    //
+
+    unsigned long now = millis();
+    if ((imageNumber >= 0) && ((now - lastPrintTime) > PRINT_DELAY)) {
+        lastPrintTime = now;
+
+        if (imageNumber >= 0) {
+            Serial.println("Printing image " + String(imageNumber));
+            sendPrintCommand(imageNumber);
+        }
+    }
+}
+
 
 void hoverTick() {
 
@@ -315,4 +380,14 @@ void bumperCallback() {
         digitalWrite(D7,LOW);
     }
 }
+
+
+void sendPrintCommand(int index) {
+    CANMessage message;
+    message.id = CAN_PRINT_MESSAGE_ID;
+    message.len = 1;
+    setU8(message.data, index, 0);
+    can.transmit(message);
+}
+
 
