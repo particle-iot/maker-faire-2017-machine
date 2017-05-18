@@ -249,6 +249,7 @@ bool panel1GreenPressed;
 bool panel1BluePressed;
 
 void updatePanel1() {
+  Serial.printlnf("rx=%d active=%d rgb=%d/%d/%d", comms.Panel1StatusLastRx, comms.Input1Active, comms.RedButtonPressed, comms.GreenButtonPressed, comms.BlueButtonPressed);
   if (comms.Input1Active) {
     // panel just became active
     if (!panelActive[PANEL1]) {

@@ -9,6 +9,7 @@
 #include "Adafruit_TCS34725.h"
 #include "math.h"
 
+SYSTEM_MODE(MANUAL);
 SYSTEM_THREAD(ENABLED);
 
 /* Define AUTO_START to true during testing and false during the event.
@@ -26,7 +27,7 @@ bool runMachine = AUTO_START;
 
 /* Color sensor SDA D0 */
 /* Color sensor SCL D1 */
-const auto BALL_PUMP_PIN = D3;
+const auto BALL_PUMP_PIN = D7;
 
 const auto LASER_ENABLE_PIN = A0;
 const auto BALL_DETECTOR_TOP_PIN = A1;
@@ -84,6 +85,7 @@ Storage<Config> storage(defaultConfig);
 
 void setup() {
   Serial.begin();
+  setupCharging();
   loadStorage();
   setupComms();
   setupColorSensor();
@@ -107,6 +109,11 @@ void loop() {
   printStatus();
   transmitComms();
   storeBallCount();
+}
+
+void setupCharging() {
+  PMIC power;
+  power.disableCharging();
 }
 
 /*
@@ -272,13 +279,13 @@ void controlServos() {
         bottomServoPos = config.bottomServoClosedPos;
         break;
       case MIDDLE_GATE_OPEN:
-        topServoPos = config.topServoOpenPos;
+        topServoPos = config.topServoClosedPos;
         middleServoPos = config.middleServoOpenPos;
         bottomServoPos = config.bottomServoClosedPos;
         break;
       case BOTTOM_GATE_OPEN:
-        topServoPos = config.topServoOpenPos;
-        middleServoPos = config.middleServoOpenPos;
+        topServoPos = config.topServoClosedPos;
+        middleServoPos = config.middleServoClosedPos;
         bottomServoPos = config.bottomServoOpenPos;
         break;
     }
@@ -295,12 +302,14 @@ void controlServos() {
  * Main panel control
  */
 
-enum ColorMatch_e {
+enum SensorColor_e {
   OTHER_COLOR,
   ORANGE_COLOR,
   CYAN_COLOR,
   MAGENTA_COLOR
-} colorMatch = OTHER_COLOR;
+};
+SensorColor_e sensorColor = OTHER_COLOR;
+SensorColor_e colorMatch = OTHER_COLOR;
 
 enum PanelState_e {
   WAIT_FOR_COLOR,
@@ -312,19 +321,20 @@ bool panelActive = false;
 
 void doPanelControl() {
   auto now = millis();
-  ColorMatch_e colorMatchNew = OTHER_COLOR;
   if (red > 2 * blue && green > blue) {
-    colorMatchNew = ORANGE_COLOR;
+    sensorColor = ORANGE_COLOR;
   } else if (blue > 2*red && green > red) {
-    colorMatchNew = CYAN_COLOR;
+    sensorColor = CYAN_COLOR;
   } else if (red > green && blue > green) {
-    colorMatchNew = MAGENTA_COLOR;
+    sensorColor = MAGENTA_COLOR;
+  } else {
+    sensorColor = OTHER_COLOR;
   }
 
   switch (panelState) {
     case WAIT_FOR_COLOR:
-      if (colorMatchNew != colorMatch) {
-        colorMatch = colorMatchNew;
+      if (sensorColor != OTHER_COLOR && sensorColor != colorMatch) {
+        colorMatch = sensorColor;
         panelState = COLOR_MATCHED;
         gatesState = ALL_GATES_CLOSED;
         panelTime = now;
@@ -396,11 +406,13 @@ void printStatus() {
   printLastUpdate = now;
 
   Serial.printlnf(
-    "rgb=%d/%d/%d color=%d st=%d pump=%d servos=%d/%d/%d beams=%d/%d balls=%d active=%d",
+    "rgb=%d/%d/%d color=%d/%d gates=%d panel=%d pump=%d servos=%d/%d/%d beams=%d/%d balls=%d active=%d",
     red,
     green,
     blue,
+    sensorColor,
     colorMatch,
+    gatesState,
     panelState,
     runBallPump,
     topServoPos,
