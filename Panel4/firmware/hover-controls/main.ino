@@ -8,21 +8,23 @@
 
 #define STEP_CLOCK_DURATION 1
 
-#define BUMP_BTN_PIN1 A0
-#define BUMP_BTN_PIN2 A1
-#define STEPPER_EN_PIN A3
-#define STEPPER_STEP_PIN A4
-#define STEPPER_DIRECTION_PIN A5
+#define BUMP_BTN_PIN1 B0
+#define BUMP_BTN_PIN2 B1
 
-#define LASER_GATE1 D1
-#define LASER_GATE2 D2
-#define LASER_GATE3 D3
+#define STEPPER_EN_PIN C0
+#define STEPPER_DIRECTION_PIN C1
+#define STEPPER_STEP_PIN D2
+
+#define LASER_ENABLE A0
+#define LASER_GATE1 A1
+#define LASER_GATE2 A2
+#define LASER_GATE3 A3
 
 #define HOVER_TS_PIN D4
 #define HOVER_RST_PIN D5
 
-#define BALL_PUMP_PIN B0
-#define BALLS_FULL_PIN B0
+#define BALL_PUMP_PIN C3
+#define BALLS_FULL_PIN C2
 
 #define STEPPER_DIRECTION_LEFT LOW
 #define STEPPER_DIRECTION_RIGHT HIGH
@@ -62,7 +64,7 @@ unsigned long lastHoverCheck = 0;
 bool state = false;
 
 // TODO: how long should this run for?
-#define DISPENSE_BALL_DURATION 3000
+#define DISPENSE_BALL_DURATION 1250
 bool dispensingBall = false;
 unsigned long startedDispensingBallTime = 0;
 
@@ -84,6 +86,7 @@ int counters[4] = {0,0,0,0};
 unsigned long lastPrintTime = 0;
 
 bool isMachineStopped = false;
+bool blink_state = false;
 
 /*
     How to wire it up!
@@ -120,6 +123,9 @@ void setup() {
     pinMode(BALLS_FULL_PIN, INPUT);
 
 
+    pinMode(LASER_ENABLE, OUTPUT);
+    digitalWrite(LASER_ENABLE, HIGH);
+
     pinMode(LASER_GATE1, INPUT);
     pinMode(LASER_GATE2, INPUT);
     pinMode(LASER_GATE3, INPUT);
@@ -134,15 +140,13 @@ void setup() {
     bumperChecker.start();
 
     //start up the can bus
-    //can.begin(500000);
+    can.begin(500000);
 
     PMIC power;
     power.disableCharging();
 }
 
 void loop() {
-    // state = !state;
-    // bool blink_state = false;
     hoverTick();
 
     checkLaserGates();
@@ -151,13 +155,11 @@ void loop() {
 
     transmitCANUpdates();
 
-//  static long t = millis();
-//  if (millis() - t > 10) {
-//    t = millis();
-//    comms.InputColorHue++;
-//  }
-//
-
+    if (isMachineStopped) {
+        digitalWrite(D7, (blink_state) ? HIGH : LOW);
+        blink_state = !blink_state;
+        delay(10);
+    }
 }
 
 unsigned long lastCanUpdateTime = 0;
@@ -213,8 +215,6 @@ void transmitCANUpdates() {
     comms.PrintingPrizeA = false;
     comms.PrintingPrizeB = false;
     comms.PrintingPrizeC = false;
-
-
 }
 
 
@@ -232,17 +232,17 @@ void checkLaserGates() {
     //
 
     if (buttonOne) {
-        imageNumber = 1;
+        imageNumber = 5;
         counters[0]++;
         comms.PrintingPrizeA = true;
     }
     else if (buttonTwo) {
-        imageNumber = 2;
+        imageNumber = 6;
         counters[1]++;
         comms.PrintingPrizeB = true;
     }
     else if (buttonThree) {
-        imageNumber = 3;
+        imageNumber = 2;
         counters[2]++;
         comms.PrintingPrizeC = true;
     }
@@ -256,6 +256,8 @@ void checkLaserGates() {
         lastPrintTime = now;
 
         if (imageNumber >= 0) {
+            Serial.println("1,2,3 " + String(buttonOne) + "," + String(buttonTwo) + "," + String(buttonThree));
+
             Serial.println("Printing image " + String(imageNumber));
             sendPrintCommand(imageNumber);
         }
@@ -339,6 +341,10 @@ void hoverTick() {
     comms.HoverPositionLR = p.x;//getU8(m.data, 2);
     comms.HoverPositionUD = p.z;//getU8(m.data, 3);
 
+    if ((p.z == 0) && ( _myMotorAction == MotorAction::STOP)) {
+        dispenseBall();
+    }
+
     Touch t = hover.getTouch();
     if ( t.touchID != 0) {
         Serial.print("Touch Event: "); Serial.print(t.touchType); Serial.print("\t");
@@ -363,10 +369,10 @@ void dispenseBallTick() {
     }
     else {
         // putting this here so we don't chain dispense'es
-        if (digitalRead(BALLS_FULL_PIN) == HIGH) {
-            //Serial.println("Balls full pin is high");
-            dispenseBall();
-        }
+//        if (digitalRead(BALLS_FULL_PIN) == HIGH) {
+//            //Serial.println("Balls full pin is high");
+//            dispenseBall();
+//        }
     }
 }
 
@@ -395,6 +401,7 @@ void controlMotor(MotorAction action) {
                 _isMotorStepping = true;
             }
             else {
+                Serial.println("want left but bumper is on");
                 _isMotorStepping = false;
             }
 
@@ -406,6 +413,7 @@ void controlMotor(MotorAction action) {
                  _isMotorStepping = true;
             }
             else {
+                Serial.println("want right but bumper is on");
                 _isMotorStepping = false;
             }
 
@@ -421,6 +429,7 @@ void controlMotor(MotorAction action) {
 
     if (isMachineStopped) {
         _isMotorStepping = false;
+        Serial.println("Would move except CAN BUS MOTOR STOPPED");
     }
 
     if (_isMotorStepping) {
@@ -480,7 +489,6 @@ void bumperCallback() {
 
 
 void sendPrintCommand(int index) {
-
     CANMessage message;
     message.id = CAN_PRINT_MESSAGE_ID;
     message.len = 1;
