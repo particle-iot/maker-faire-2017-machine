@@ -105,9 +105,9 @@ Config defaultConfig = {
   /* ballWheelStallDetection */ 0,
   /* autoDoors */ 1,
   /* wheelPulsesPerBall */ 2400 / 36.0,
-  /* servo1OpenPos */ 68,
+  /* servo1OpenPos */ 76,
   /* servo1ClosedPos */ 98,
-  /* servo2OpenPos */ 60,
+  /* servo2OpenPos */ 65,
   /* servo2ClosedPos */ 87,
   /* overrideSpeed */ 2000,
 };

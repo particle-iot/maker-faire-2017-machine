@@ -247,7 +247,7 @@ Servo bottomServo;
 uint8_t topServoPos = 0;
 uint8_t middleServoPos = 0;
 uint8_t bottomServoPos = 0;
-bool autoServo = false; // FIXME
+bool autoServo = true;
 
 void setupServos() {
   topServoPos = config.topServoClosedPos;
@@ -321,9 +321,9 @@ bool panelActive = false;
 void doPanelControl() {
   auto now = millis();
   if (red > 2 * blue && green > blue) {
-    sensorColor = ORANGE_COLOR;
-  } else if (blue > 2*red && green > red) {
     sensorColor = CYAN_COLOR;
+  } else if (blue > 2*red && green > red) {
+    sensorColor = ORANGE_COLOR;
   } else if (red > green && blue > green) {
     sensorColor = MAGENTA_COLOR;
   } else {
