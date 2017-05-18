@@ -18,7 +18,7 @@ void setup() {
 
     Particle.function("sendPrint", onTestPrint);
 
-    can.begin(100000);
+    can.begin(500000);
 
 }
 

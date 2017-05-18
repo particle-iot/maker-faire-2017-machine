@@ -1,5 +1,10 @@
 #include "Hover.h"
-#include "bitset.h"
+
+
+#include "can-lib/bitset.h"
+#include "can-lib/can-interface.h"
+#include "can-lib/mf2017-can.h"
+
 
 #define STEP_CLOCK_DURATION 1
 
@@ -67,6 +72,8 @@ CANChannel can(CAN_C4_C5);
 #define CAN_PRINT_MESSAGE_ID 0x204
 
 
+
+
 // laser gate stuff
 #define PRINT_DELAY 1000
 int counters[4] = {0,0,0,0};
@@ -120,6 +127,9 @@ void setup() {
 
     // run me forever
     bumperChecker.start();
+
+    //start up the can bus
+    can.begin(500000);
 
     PMIC power;
     power.disableCharging();

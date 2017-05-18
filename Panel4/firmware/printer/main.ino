@@ -1,21 +1,18 @@
 SYSTEM_THREAD(ENABLED);
 
-// This #include statement was automatically added by the Particle IDE.
-#include "lib/SdFat.h"
+#include "bitset.h"
 
-// This #include statement was automatically added by the Particle IDE.
+#include "lib/SdFat.h"
 #include "cdam_printer.h"
 #include "cdam_const_config.h"
 #define kIntervalPrinterMillis 100
 
-#include "bitset.h"
 
 #define PRINT_DELAY 1000
 unsigned long lastPrintTime = 0;
 
 #define CAN_PRINT_MESSAGE_ID 0x204
 
-//int counters[4] = {0,0,0,0};
 
 #define CS_PIN SS
 SdFat SD;
@@ -57,7 +54,8 @@ void setup() {
 
 	//TODO: CAN-BUS PUBLISH COUNTS
 
-    can.begin(100000);
+    can.begin(500000);
+
 
     PMIC power;
     power.disableCharging();
