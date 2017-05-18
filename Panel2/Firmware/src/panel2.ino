@@ -9,7 +9,6 @@
 #include "Adafruit_TCS34725.h"
 #include "math.h"
 
-SYSTEM_MODE(MANUAL);
 SYSTEM_THREAD(ENABLED);
 
 /* Define AUTO_START to true during testing and false during the event.
@@ -63,16 +62,16 @@ struct Config {
 } config;
 
 Config defaultConfig = {
-  /* app */ APP_CODE('M', 'F', '2', 0), // increment last digit to reset EEPROM on boot
+  /* app */ APP_CODE('M', 'F', '2', 1), // increment last digit to reset EEPROM on boot
   /* ballCount */ 0,
   /* ballPumpStartDelay */ 500,
   /* ballPumpStopDelay */ 2000,
   /* gateDelay */ 750,
   /* interactionTimeout */ 5000,
-  /* topServoOpenPos */ 45,
-  /* topServoClosedPos */ 89,
-  /* middleServoOpenPos */ 45,
-  /* middleServoClosedPos */ 89,
+  /* topServoOpenPos */ 135,
+  /* topServoClosedPos */ 91,
+  /* middleServoOpenPos */ 135,
+  /* middleServoClosedPos */ 91,
   /* bottomServoOpenPos */ 135,
   /* bottomServoClosedPos */ 91,
 };
@@ -248,7 +247,7 @@ Servo bottomServo;
 uint8_t topServoPos = 0;
 uint8_t middleServoPos = 0;
 uint8_t bottomServoPos = 0;
-bool autoServo = true;
+bool autoServo = false; // FIXME
 
 void setupServos() {
   topServoPos = config.topServoClosedPos;

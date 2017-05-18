@@ -64,15 +64,15 @@ struct Config {
 } config;
 
 Config defaultConfig = {
-  /* app */ APP_CODE('M', 'F', '1', 1), // increment last digit to reset EEPROM on boot
+  /* app */ APP_CODE('M', 'F', '1', 2), // increment last digit to reset EEPROM on boot
   /* ballCount1 */ 0,
   /* ballCount2 */ 0,
   /* ballCount3 */ 0,
-  /* servoPos1 */ 60,
-  /* servoPos2 */ 80,
-  /* servoPos3 */ 100,
+  /* servoPos1 */ 53,
+  /* servoPos2 */ 90,
+  /* servoPos3 */ 137,
   /* trackSelectTime */ 500,
-  /* ballPumpRunTime */ 3000,
+  /* ballPumpRunTime */ 1500,
   /* hopperStartDelay */ 2000,
   /* hopperStopDelay */ 1000,
   /* hopperMaxRunTime */ 5000,
