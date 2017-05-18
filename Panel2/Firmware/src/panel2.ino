@@ -318,7 +318,7 @@ void doPanelControl() {
   } else if (blue > 2*red && green > red) {
     colorMatchNew = CYAN_COLOR;
   } else if (red > green && blue > green) {
-    colorMatchNew = PURPLE_COLOR;
+    colorMatchNew = MAGENTA_COLOR;
   }
 
   switch (panelState) {
@@ -396,10 +396,11 @@ void printStatus() {
   printLastUpdate = now;
 
   Serial.printlnf(
-    "rgb=%d/%d/%d st=%d pump=%d servos=%d/%d/%d beams=%d/%d balls=%d active=%d",
+    "rgb=%d/%d/%d color=%d st=%d pump=%d servos=%d/%d/%d beams=%d/%d balls=%d active=%d",
     red,
     green,
     blue,
+    colorMatch,
     panelState,
     runBallPump,
     topServoPos,
