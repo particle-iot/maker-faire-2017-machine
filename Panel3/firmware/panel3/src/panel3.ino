@@ -37,6 +37,7 @@ const auto SERVO_1_PIN = A4;
 const auto SERVO_2_PIN = A5;
 const auto BALL_WHEEL_MOTOR_SPEED_PIN = DAC;
 const auto BALL_DETECTOR_3_PIN = WKP;
+const auto WHEEL_TURN_PIN = TX;
 
 /*
  * CAN communication
@@ -88,6 +89,7 @@ struct Config {
   uint8_t servo1ClosedPos;
   uint8_t servo2OpenPos;
   uint8_t servo2ClosedPos;
+  uint16_t overrideSpeed;
 } config;
 
 Config defaultConfig = {
@@ -103,10 +105,11 @@ Config defaultConfig = {
   /* ballWheelStallDetection */ 0,
   /* autoDoors */ 1,
   /* wheelPulsesPerBall */ 2400 / 36.0,
-  /* servo1OpenPos */ 69,
-  /* servo1ClosedPos */ 99,
-  /* servo2OpenPos */ 65,
-  /* servo2ClosedPos */ 95,
+  /* servo1OpenPos */ 68,
+  /* servo1ClosedPos */ 98,
+  /* servo2OpenPos */ 60,
+  /* servo2ClosedPos */ 87,
+  /* overrideSpeed */ 2000,
 };
 
 Storage<Config> storage(defaultConfig);
@@ -260,10 +263,14 @@ long wheelPosition = 0;
 long oldWheelPosition = 0;
 uint16_t motorStallCounter = 0;
 
+bool wheelTurnOverride = false;
+const auto WHEEL_TURN_PRESSED = LOW;
+
 void setupMotor() {
   pinMode(BALL_WHEEL_KILL_SWITCH_PIN, OUTPUT);
   digitalWrite(BALL_WHEEL_KILL_SWITCH_PIN, MOTOR_KILL);
   pinMode(BALL_WHEEL_MOTOR_SPEED_PIN, OUTPUT);
+  pinMode(WHEEL_TURN_PIN, INPUT_PULLUP);
 }
 
 void controlMotor() {
@@ -272,6 +279,8 @@ void controlMotor() {
     return;
   }
   motorControlLastUpdate = now;
+
+  wheelTurnOverride = digitalRead(WHEEL_TURN_PIN) == WHEEL_TURN_PRESSED;
 
   // Scale input crank speed to a voltage in the 0-3.3V range to send to
   // the motor controller
@@ -308,8 +317,14 @@ void controlMotor() {
 
   oldWheelPosition = wheelPosition;
 
-  digitalWrite(BALL_WHEEL_KILL_SWITCH_PIN, motorState);
-  analogWrite(BALL_WHEEL_MOTOR_SPEED_PIN, runMachine ? motorSpeed : 0);
+  if (wheelTurnOverride) {
+    motorSpeed = config.overrideSpeed;
+    digitalWrite(BALL_WHEEL_KILL_SWITCH_PIN, MOTOR_RUN);
+    analogWrite(BALL_WHEEL_MOTOR_SPEED_PIN, motorSpeed);
+  } else {
+    digitalWrite(BALL_WHEEL_KILL_SWITCH_PIN, motorState);
+    analogWrite(BALL_WHEEL_MOTOR_SPEED_PIN, runMachine ? motorSpeed : 0);
+  }
 }
 
 /*
@@ -424,7 +439,7 @@ void printStatus() {
   printLastUpdate = now;
 
   Serial.printlnf(
-    "%s crank=%d speed=%f wheel=%d motor=%d/%d stall=%d door=%d/%d/%d beams=%d/%d/%d balls=%d/%d/%d",
+    "%s crank=%d speed=%f wheel=%d motor=%d/%d stall=%d override=%d door=%d/%d/%d beams=%d/%d/%d balls=%d/%d/%d",
     runMachine ? "RUN " : "KILL ",
     inputCrankPosition,
     inputCrankSpeed,
@@ -502,6 +517,8 @@ int setConfigFromCloud(String arg) {
       config.servo2OpenPos = value.toInt();
     } else if (name.equals("servo2ClosedPos")) {
       config.servo2ClosedPos = value.toInt();
+    } else if (name.equals("overrideSpeed")) {
+      config.overrideSpeed = value.toInt();
     } else {
       return -2;
     }
