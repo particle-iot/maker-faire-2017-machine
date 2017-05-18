@@ -68,7 +68,11 @@ unsigned long startedDispensingBallTime = 0;
 
 SYSTEM_MODE(MANUAL);
 
-CANChannel can(CAN_C4_C5);
+
+
+//CANChannel can(CAN_C4_C5);
+BuiltinCAN can(CAN_C4_C5);
+Communication comms = Communication(can);
 #define CAN_PRINT_MESSAGE_ID 0x204
 
 
@@ -79,6 +83,7 @@ CANChannel can(CAN_C4_C5);
 int counters[4] = {0,0,0,0};
 unsigned long lastPrintTime = 0;
 
+bool isMachineStopped = false;
 
 /*
     How to wire it up!
@@ -129,7 +134,7 @@ void setup() {
     bumperChecker.start();
 
     //start up the can bus
-    can.begin(500000);
+    //can.begin(500000);
 
     PMIC power;
     power.disableCharging();
@@ -143,6 +148,73 @@ void loop() {
     checkLaserGates();
 
     dispenseBallTick();
+
+    transmitCANUpdates();
+
+//  static long t = millis();
+//  if (millis() - t > 10) {
+//    t = millis();
+//    comms.InputColorHue++;
+//  }
+//
+
+}
+
+unsigned long lastCanUpdateTime = 0;
+#define CAN_UPDATE_FREQUENCY 250
+
+void transmitCANUpdates() {
+    unsigned long now = millis();
+    if (( now - lastCanUpdateTime ) < CAN_UPDATE_FREQUENCY) {
+        return;
+    }
+    lastCanUpdateTime = now;
+
+    comms.receive();
+
+    if (comms.MachineStart) {
+        isMachineStopped = false;
+    }
+    else if (comms.MachineStop) {
+        isMachineStopped = true;
+    }
+
+
+    //case Panel4Status:
+
+    comms.BallDropperLeftLimit = _isLeftBumpSwitchOn;//getBit(m.data, 0, 1);
+    comms.BallDropperRightLimit = _isRightBumpSwitchOn;//getBit(m.data, 0, 2);
+
+    // these are set by the print routines
+    //    comms.PrintingPrizeA
+    //    comms.PrintingPrizeB
+    //    comms.PrintingPrizeC
+
+    // these are set by the hover routines
+    //    comms.HoverPositionLR = getU8(m.data, 2);
+    //    comms.HoverPositionUD = getU8(m.data, 3);
+
+
+    // what are these?
+    //    comms.Reservoir4Status = static_cast<ReservoirStatus>(getU8(m.data, 1));
+    //    comms.Input4Active = getBit(m.data, 0, 0);
+    //    comms.BallCount4 = getU32(m.data, 4);
+
+
+    //case Panel4OutputStatus:
+    comms.PrizeCountA = counters[0];
+    comms.PrizeCountB = counters[1];
+    comms.PrizeCountC = counters[2];
+
+    comms.transmit(MachineModules::Panel4);
+
+
+    // reset momentary elements
+    comms.PrintingPrizeA = false;
+    comms.PrintingPrizeB = false;
+    comms.PrintingPrizeC = false;
+
+
 }
 
 
@@ -162,14 +234,17 @@ void checkLaserGates() {
     if (buttonOne) {
         imageNumber = 1;
         counters[0]++;
+        comms.PrintingPrizeA = true;
     }
     else if (buttonTwo) {
         imageNumber = 2;
         counters[1]++;
+        comms.PrintingPrizeB = true;
     }
     else if (buttonThree) {
         imageNumber = 3;
         counters[2]++;
+        comms.PrintingPrizeC = true;
     }
 
     //
@@ -261,6 +336,9 @@ void hoverTick() {
     if ((now - lastHoverCheck) < 250) {
         Serial.println(String::format("(%d, %d, %d) direction %s ", p.x, p.y, p.z, dir));
     }
+    comms.HoverPositionLR = p.x;//getU8(m.data, 2);
+    comms.HoverPositionUD = p.z;//getU8(m.data, 3);
+
     Touch t = hover.getTouch();
     if ( t.touchID != 0) {
         Serial.print("Touch Event: "); Serial.print(t.touchType); Serial.print("\t");
@@ -341,6 +419,10 @@ void controlMotor(MotorAction action) {
         break;
     }
 
+    if (isMachineStopped) {
+        _isMotorStepping = false;
+    }
+
     if (_isMotorStepping) {
         //stepperTimer.start();
         digitalWrite(STEPPER_EN_PIN, LOW);
@@ -374,6 +456,11 @@ void bumperCallback() {
     _isBumpSwitchOn = _isLeftBumpSwitchOn || _isRightBumpSwitchOn;
 
 
+
+
+    if (isMachineStopped) {
+        digitalWrite(STEPPER_EN_PIN, HIGH); //motor off
+    }
     if (_isLeftBumpSwitchOn && (_myMotorAction == MotorAction::LEFT)) {
         digitalWrite(STEPPER_EN_PIN, HIGH); //motor off
     }
@@ -393,6 +480,7 @@ void bumperCallback() {
 
 
 void sendPrintCommand(int index) {
+
     CANMessage message;
     message.id = CAN_PRINT_MESSAGE_ID;
     message.len = 1;

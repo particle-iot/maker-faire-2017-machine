@@ -211,6 +211,20 @@ void Communication::transmit(MachineModules module) {
         can.transmit(m);
       }
 
+      if (now - Panel4OutputStatusLastTx >= 100) {
+        Panel4OutputStatusLastTx = now;
+        CANMessage m;
+        m.id = Panel4OutputStatus;
+        m.len = 8;
+        setU16(m.data, PrizeCountA, 0);
+        setU16(m.data, PrizeCountB, 2);
+        setU16(m.data, PrizeCountC, 4);
+
+        can.transmit(m);
+      }
+
+      //TODO: output status?
+
       break;
 
     case MachineModules::Lights:

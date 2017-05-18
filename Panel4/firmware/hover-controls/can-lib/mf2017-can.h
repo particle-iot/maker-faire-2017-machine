@@ -85,6 +85,8 @@ public:
   long Panel3OutputStatusLastTx;
   long Panel3OutputStatusLastRx;
 
+
+
   // Panel4
   bool Input4Active;
   ReservoirStatus Reservoir4Status;
