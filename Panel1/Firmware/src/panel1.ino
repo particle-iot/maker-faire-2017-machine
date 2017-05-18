@@ -64,11 +64,11 @@ struct Config {
 } config;
 
 Config defaultConfig = {
-  /* app */ APP_CODE('M', 'F', '1', 2), // increment last digit to reset EEPROM on boot
+  /* app */ APP_CODE('M', 'F', '1', 6), // increment last digit to reset EEPROM on boot
   /* ballCount1 */ 0,
   /* ballCount2 */ 0,
   /* ballCount3 */ 0,
-  /* servoPos1 */ 53,
+  /* servoPos1 */ 56,
   /* servoPos2 */ 90,
   /* servoPos3 */ 137,
   /* trackSelectTime */ 500,
@@ -76,7 +76,7 @@ Config defaultConfig = {
   /* hopperStartDelay */ 2000,
   /* hopperStopDelay */ 1000,
   /* hopperMaxRunTime */ 5000,
-  /* waitTime */ 2000,
+  /* waitTime */ 4000,
 };
 
 Storage<Config> storage(defaultConfig);
@@ -227,13 +227,20 @@ const auto TURBINES_STOP = LOW;
 
 bool runTurbines = false;
 
+Timer timerTurbine(4000, stopTurbines, true); // one_shot 2 second auto-off
+
+void stopTurbines() {
+  runTurbines = false;
+  digitalWrite(TURBINES_PIN, runMachine && runTurbines ? TURBINES_RUN : TURBINES_STOP);
+}
+
 void setupTurbines() {
   pinMode(TURBINES_PIN, OUTPUT);
   digitalWrite(TURBINES_PIN, TURBINES_STOP);
 }
 
 void controlTurbines() {
-  digitalWrite(TURBINES_PIN, runMachine && runTurbines ? TURBINES_RUN : TURBINES_STOP);
+  // digitalWrite(TURBINES_PIN, runMachine && runTurbines ? TURBINES_RUN : TURBINES_STOP);
 }
 
 /*
@@ -306,6 +313,13 @@ Servo servo;
 
 uint8_t servoPos = 0;
 bool autoServo = true;
+bool isServoSelectEnabled = true;
+
+Timer timerSelector(4000, enableSelect, true); // one_shot 4 second auto-off
+
+void enableSelect() {
+  isServoSelectEnabled = true;
+}
 
 enum TrackSelectorState_e {
   TRACK_1,
@@ -314,9 +328,11 @@ enum TrackSelectorState_e {
 } trackSelectorState = TRACK_1;
 
 void setupServos() {
-  servoPos = config.servoPos1;
-  servo.attach(SERVO_PIN);
-  servo.write(servoPos);
+  if (isServoSelectEnabled) {
+    servoPos = config.servoPos1;
+    servo.attach(SERVO_PIN);
+    servo.write(servoPos);
+  }
 }
 
 void controlServos() {
@@ -360,17 +376,21 @@ void doPanelControl() {
 
   switch (panelState) {
     case PANEL_IDLE:
-      if (redButtonPressed || greenButtonPressed || blueButtonPressed) {
+      if (isServoSelectEnabled && (redButtonPressed || greenButtonPressed || blueButtonPressed)) {
         panelState = PANEL_SELECT_TRACK;
         trackSelectStartTime = now;
         if (blueButtonPressed) {
           trackSelectorState = TRACK_1;
           runTurbines = true;
+          digitalWrite(TURBINES_PIN, runMachine && runTurbines ? TURBINES_RUN : TURBINES_STOP);
+          timerTurbine.start(); // enable watchdog
         } else if (redButtonPressed) {
           trackSelectorState = TRACK_2;
         } else if (greenButtonPressed) {
           trackSelectorState = TRACK_3;
         }
+        timerSelector.start(); // enable watchdog
+        isServoSelectEnabled = false; // now disable the servo selection
       }
       break;
 
@@ -397,7 +417,7 @@ void doPanelControl() {
   }
 
   if (runTurbines && beamBroken1) {
-    runTurbines = false;
+    timerTurbine.start(); // enable watchdog for delayed shut-off
   }
 }
 
