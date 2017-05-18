@@ -169,6 +169,10 @@ void printImage(int imageNumber) {
             printImageFile(190, 190, "particle_logo.raw");
         break;
 
+        case 5: printImageFile(271, 393, "beachball.raw"); break;
+        case 6: printImageFile(271, 393, "silly.raw"); break;
+        case 7: printImageFile(271, 393, "nyancat.raw"); break;
+
         // //TODO: obviously remove this before production
 //        case 99:
 //             printImageFile(204, 247, "etjgJ2D.raw");
