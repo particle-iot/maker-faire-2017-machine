@@ -447,7 +447,8 @@ void printStatus() {
   printLastUpdate = now;
 
   Serial.printlnf(
-    "rgb=%d/%d/%d st=%d hop=%d pump=%d turb=%d servo=%d beams=%d/%d/%d/%d balls=%d/%d/%d",
+    "%s rgb=%d/%d/%d st=%d hop=%d pump=%d turb=%d servo=%d beams=%d/%d/%d/%d balls=%d/%d/%d",
+    runMachine ? "RUN " : "STOP",
     redButtonPressed,
     greenButtonPressed,
     blueButtonPressed,

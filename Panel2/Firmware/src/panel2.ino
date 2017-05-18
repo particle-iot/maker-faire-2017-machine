@@ -295,69 +295,55 @@ void controlServos() {
  * Main panel control
  */
 
+enum ColorMatch_e {
+  OTHER_COLOR,
+  ORANGE_COLOR,
+  CYAN_COLOR,
+  MAGENTA_COLOR
+} colorMatch = OTHER_COLOR;
+
 enum PanelState_e {
-  WAIT_FOR_COLOR_1,
-  COLOR_1_MATCHED,
-  WAIT_FOR_COLOR_2,
-  COLOR_2_MATCHED,
-  WAIT_FOR_COLOR_3,
-  COLOR_3_MATCHED
-} panelState = WAIT_FOR_COLOR_1;
+  WAIT_FOR_COLOR,
+  COLOR_MATCHED,
+} panelState = WAIT_FOR_COLOR;
 
 uint32_t panelTime = 0;
 bool panelActive = false;
-uint16_t matchedColor = 0;
-#define ORANGE_HUE 25
-#define CYAN_HUE 128
-#define MAGENTA_HUE 213
 
 void doPanelControl() {
   auto now = millis();
+  ColorMatch_e colorMatchNew = OTHER_COLOR;
+  if (red > 2 * blue && green > blue) {
+    colorMatchNew = ORANGE_COLOR;
+  } else if (blue > 2*red && green > red) {
+    colorMatchNew = CYAN_COLOR;
+  } else if (red > green && blue > green) {
+    colorMatchNew = PURPLE_COLOR;
+  }
 
   switch (panelState) {
-    case WAIT_FOR_COLOR_1:
-      // match orange
-      if (red > 2 * blue && green > blue) {
-        panelState = COLOR_1_MATCHED;
-        gatesState = TOP_GATE_OPEN;
-        matchedColor = ORANGE_HUE;
+    case WAIT_FOR_COLOR:
+      if (colorMatchNew != colorMatch) {
+        colorMatch = colorMatchNew;
+        panelState = COLOR_MATCHED;
+        gatesState = ALL_GATES_CLOSED;
         panelTime = now;
       }
       break;
-    case COLOR_1_MATCHED:
+    case COLOR_MATCHED:
       if (now - panelTime > config.gateDelay) {
-        panelState = WAIT_FOR_COLOR_2;
-        gatesState = ALL_GATES_CLOSED;
-      }
-      break;
-    case WAIT_FOR_COLOR_2:
-      // match cyan
-      if (blue > 2*red && green > red) {
-        panelState = COLOR_2_MATCHED;
-        gatesState = MIDDLE_GATE_OPEN;
-        matchedColor = CYAN_HUE;
-        panelTime = now;
-      }
-      break;
-    case COLOR_2_MATCHED:
-      if (now - panelTime > config.gateDelay) {
-        panelState = WAIT_FOR_COLOR_3;
-        gatesState = ALL_GATES_CLOSED;
-      }
-      break;
-    case WAIT_FOR_COLOR_3:
-      // match magenta
-      if (red > green && blue > green) {
-        panelState = COLOR_3_MATCHED;
-        gatesState = BOTTOM_GATE_OPEN;
-        matchedColor = MAGENTA_HUE;
-        panelTime = now;
-      }
-      break;
-    case COLOR_3_MATCHED:
-      if (now - panelTime > config.gateDelay) {
-        panelState = WAIT_FOR_COLOR_1;
-        gatesState = ALL_GATES_CLOSED;
+        panelState = WAIT_FOR_COLOR;
+        switch (colorMatch) {
+          case ORANGE_COLOR:
+            gatesState = TOP_GATE_OPEN;
+            break;
+          case CYAN_COLOR:
+            gatesState = MIDDLE_GATE_OPEN;
+            break;
+          case MAGENTA_COLOR:
+            gatesState = BOTTOM_GATE_OPEN;
+            break;
+        }
       }
       break;
   }
@@ -384,7 +370,12 @@ void receiveComms() {
 
 void transmitComms() {
   comms.Input2Active = panelActive;
-  comms.InputColorHue = matchedColor;
+  switch (colorMatch) {
+    case ORANGE_COLOR:  comms.InputColorHue = 25; break;
+    case CYAN_COLOR:    comms.InputColorHue = 128; break;
+    case MAGENTA_COLOR: comms.InputColorHue = 213; break;
+    default:            comms.InputColorHue = 0; break;
+  }
   comms.BallCount2 = ballCount;
 
   comms.transmit(MachineModules::Panel2);
