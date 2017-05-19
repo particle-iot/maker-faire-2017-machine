@@ -295,9 +295,9 @@ Snap.load('maker-faire-control-panel.svg', function (f) {
       this.showLightWithTimeout(data, 'BlueButtonPressed', panel1.blueLight);
       this.showLightWithTimeout(data, 'RedButtonPressed', panel1.redLight);
       this.showLightWithTimeout(data, 'GreenButtonPressed', panel1.greenLight);
-      displayNumber(data.BlueBallCount, panel1.blueNumbers);
-      displayNumber(data.RedBallCount, panel1.redNumbers);
-      displayNumber(data.GreenBallCount, panel1.greenNumbers);
+      displayNumber(data.RedBallCount, panel1.blueNumbers);
+      displayNumber(data.GreenBallCount, panel1.redNumbers);
+      displayNumber(data.BlueBallCount + 255, panel1.greenNumbers);
 
       // Panel 2
       this.showLightWithTimeout(data, 'Input2Active', panel2.yellowLight);
