@@ -99,7 +99,7 @@ Config defaultConfig = {
   /* ballCount3 */ 0,
   /* inputCrankPulsesPerRevolution */ 1200,
   /* inputCrankInterval */ 100,
-  /* ballWheelSpeedFactor */ 600.0,
+  /* ballWheelSpeedFactor */ 2000.0,
   /* ballWheelMinSpeed */ 200,
   /* ballWheelMaxSpeed */ 4000,
   /* ballWheelStallDetection */ 0,

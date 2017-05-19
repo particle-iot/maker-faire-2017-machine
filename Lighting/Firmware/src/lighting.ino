@@ -337,8 +337,19 @@ void updatePanel2() {
   shiftPanel(PANEL2);
 
   // Compute RGB of input hue
-  RgbColor rgb = HsvToRgb(HsvColor(comms.InputColorHue, 255, 255));
-  uint32_t c = strip.Color(rgb.r, rgb.g, rgb.b);
+  uint32_t c = 0;
+  switch (comms.InputColorHue) {
+    case 25: // Cyan
+      c = strip.Color(0x00, 0xFF, 0xFF);
+      break;
+    case 128: // Orange
+      c = strip.Color(0xFF, 0x30, 0x0);
+      break;
+    case 213: // Magenta
+      c = strip.Color(0x8B, 0x00, 0x8B);
+      break;
+  }
+
   unsigned first = config.panelFirst[PANEL2];
   panelPixels[first] = c;
 

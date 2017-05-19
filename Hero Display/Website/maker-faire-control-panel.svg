@@ -1547,8 +1547,7 @@
 </g><g
        id="inner-titles"
        inkscape:groupmode="layer"
-       style="display:inline"
-       sodipodi:insensitive="true"><g
+       style="display:inline"><g
          id="g655"><rect
            id="rect657"
            height="49"
@@ -1602,7 +1601,7 @@
                offset="0.901" /></linearGradient><polygon
              clip-path="url(#SVGID_44_)"
              id="polygon682"
-             points="511.8,75.1 229.9,356.9 -35,92 246.9,-189.9 "
+             points="-35,92 246.9,-189.9 511.8,75.1 229.9,356.9 "
              class="st45"
              style="fill:url(#SVGID_45_)" /></g><text
            id="text684"
@@ -1663,7 +1662,7 @@
                offset="0.901" /></linearGradient><polygon
              clip-path="url(#SVGID_47_)"
              id="polygon713"
-             points="511.8,334.1 229.9,615.9 -35,351 246.9,69.1 "
+             points="-35,351 246.9,69.1 511.8,334.1 229.9,615.9 "
              class="st48"
              style="fill:url(#SVGID_48_)" /></g><text
            id="text715"
@@ -1724,13 +1723,13 @@
                offset="0.901" /></linearGradient><polygon
              clip-path="url(#SVGID_50_)"
              id="polygon744"
-             points="511.8,584.1 229.9,865.9 -35,601 246.9,319.1 "
+             points="-35,601 246.9,319.1 511.8,584.1 229.9,865.9 "
              class="st49"
              style="fill:url(#SVGID_51_)" /></g><text
            id="text746"
            class="st1 st46 st47"
            transform="translate(44.6227,601.0825)"
-           style="font-size:29.41500092px;font-family:Play-Bold;fill:#777777">SMART HOME</text>
+           style="font-size:29.41500092px;font-family:Play-Bold;fill:#777777">FACTORY</text>
 </g><g
          id="g748"><rect
            id="rect750"
@@ -1785,7 +1784,7 @@
                offset="0.901" /></linearGradient><polygon
              clip-path="url(#SVGID_53_)"
              id="polygon775"
-             points="991.8,75.1 709.9,356.9 445,92 726.9,-189.9 "
+             points="445,92 726.9,-189.9 991.8,75.1 709.9,356.9 "
              class="st50"
              style="fill:url(#SVGID_54_)" /></g><text
            id="text777"
@@ -1846,7 +1845,7 @@
                offset="0.901" /></linearGradient><polygon
              clip-path="url(#SVGID_56_)"
              id="polygon806"
-             points="991.8,435.1 709.9,716.9 445,452 726.9,170.1 "
+             points="445,452 726.9,170.1 991.8,435.1 709.9,716.9 "
              class="st51"
              style="fill:url(#SVGID_57_)" /></g><text
            id="text808"
@@ -1907,7 +1906,7 @@
                offset="0.901" /></linearGradient><polygon
              clip-path="url(#SVGID_59_)"
              id="polygon837"
-             points="991.8,225.1 709.9,506.9 445,242 726.9,-39.9 "
+             points="445,242 726.9,-39.9 991.8,225.1 709.9,506.9 "
              class="st52"
              style="fill:url(#SVGID_60_)" /></g><text
            id="text839"
@@ -1968,7 +1967,7 @@
                offset="0.901" /></linearGradient><polygon
              clip-path="url(#SVGID_62_)"
              id="polygon868"
-             points="1471.8,75.1 1189.9,356.9 925,92 1206.9,-189.9 "
+             points="925,92 1206.9,-189.9 1471.8,75.1 1189.9,356.9 "
              class="st53"
              style="fill:url(#SVGID_63_)" /></g><text
            id="text870"
@@ -2029,7 +2028,7 @@
                offset="0.901" /></linearGradient><polygon
              clip-path="url(#SVGID_65_)"
              id="polygon899"
-             points="1471.8,435.1 1189.9,716.9 925,452 1206.9,170.1 "
+             points="925,452 1206.9,170.1 1471.8,435.1 1189.9,716.9 "
              class="st54"
              style="fill:url(#SVGID_66_)" /></g><text
            id="text901"
@@ -2090,7 +2089,7 @@
                offset="0.901" /></linearGradient><polygon
              clip-path="url(#SVGID_68_)"
              id="polygon930"
-             points="1951.8,75.1 1669.9,356.9 1405,92 1686.9,-189.9 "
+             points="1405,92 1686.9,-189.9 1951.8,75.1 1669.9,356.9 "
              class="st55"
              style="fill:url(#SVGID_69_)" /></g><text
            id="text932"
@@ -2151,7 +2150,7 @@
                offset="0.901" /></linearGradient><polygon
              clip-path="url(#SVGID_71_)"
              id="polygon961"
-             points="1951.8,225.1 1669.9,506.9 1405,242 1686.9,-39.9 "
+             points="1405,242 1686.9,-39.9 1951.8,225.1 1669.9,506.9 "
              class="st56"
              style="fill:url(#SVGID_72_)" /></g><text
            id="text963"
@@ -2212,7 +2211,7 @@
                offset="0.901" /></linearGradient><polygon
              clip-path="url(#SVGID_74_)"
              id="polygon992"
-             points="1951.8,435.1 1669.9,716.9 1405,452 1686.9,170.1 "
+             points="1405,452 1686.9,170.1 1951.8,435.1 1669.9,716.9 "
              class="st57"
              style="fill:url(#SVGID_75_)" /></g><text
            id="text994"
@@ -5024,7 +5023,7 @@
            id="text1955-1-9"
            class="st39 st40 st47"
            transform="translate(236.0098,276.0347)"
-           style="font-size:29.41500092px;font-family:Play-Regular;fill:#545454">REQUESTS</text>
+           style="font-size:29.41500092px;font-family:Play-Regular;fill:#545454">PRODUCTS</text>
 </g></g><g
        id="inner-replace"
        inkscape:groupmode="layer"
