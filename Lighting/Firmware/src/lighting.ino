@@ -44,6 +44,8 @@ struct Config {
   uint16_t colorFlowDelay;
   uint16_t bulletBaseDelay;
   uint16_t hueSliderDelay;
+  uint8_t hueA;
+  uint8_t hueB;
 } config;
 
 #ifdef MINI_MODE
@@ -59,6 +61,8 @@ Config defaultConfig = {
   /* colorFlowDelay */ 100,
   /* bulletBaseDelay */ 100,
   /* hueSliderDelay */ 20,
+  /* hueA */ 10,
+  /* hueB */ 120,
 };
 #else
 Config defaultConfig = {
@@ -73,6 +77,8 @@ Config defaultConfig = {
   /* colorFlowDelay */ 30,
   /* bulletBaseDelay */ 20,
   /* hueSliderDelay */ 20,
+  /* hueA */ 10,
+  /* hueB */ 120,
 };
 #endif
 
@@ -80,7 +86,7 @@ Storage<Config> storage(defaultConfig);
 
 void setup() {
   Serial.begin();
-  storage.load(config);
+  loadConfig();
   comms.begin();
   strip.begin();
   strip.show();
@@ -100,6 +106,16 @@ void loop() {
   updatePanel4();
 
   display();
+}
+
+void loadConfig() {
+  storage.load(config);
+  if (config.hueA == 0xFF) {
+    config.hueA = defaultConfig.hueA;
+  }
+  if (config.hueB == 0xFF) {
+    config.hueB = defaultConfig.hueB;
+  }
 }
 
 void registerCloud() {
@@ -423,9 +439,6 @@ void updatePanel3() {
 /* Panel 4 interaction: hue slider
  */
 
-uint8_t leftHue = 0;
-uint8_t rightHue = 0;
-
 void updatePanel4() {
   if (comms.Input4Active) {
     // panel just became active
@@ -444,31 +457,69 @@ void updatePanel4() {
   }
   panelLastUpdate[PANEL4] = millis();
 
-  // Change left and right hue depending on the joysticks.
-  // Linearly interpolate between the 2 hues
-  leftHue = comms.HoverPositionLR;
-  rightHue = comms.HoverPositionUD;
-
-  unsigned first = config.panelFirst[PANEL4];
-  unsigned size = config.panelSize[PANEL4];
-
-  // Find the increment to be able to linearly interpolate between the 2 hues.
-  // The basic formula is delta = (rightHue - leftHue) / (size - 1)
-  // Take special care of negative numbers because these calculations
-  // are done using integer arithmetic.
-  uint16_t deltaHue;
-  int8_t diff = rightHue - leftHue;
-  if (diff >= 0) {
-    deltaHue = (diff << 8) / (size - 1);
+  if (comms.BallDropperLeftLimit || comms.BallDropperRightLimit) {
+    const auto dropperLimitWidth = 15;
+    const auto dropperLimitColor = strip.Color(255, 0, 0);
+    for (unsigned f = config.panelFirst[PANEL4], sz = config.panelSize[PANEL4], i = f; i < f + sz; i++) {
+      if (comms.BallDropperLeftLimit && i < f + dropperLimitWidth) {
+        panelPixels[i] = dropperLimitColor;
+      } else if (comms.BallDropperRightLimit && i > f + sz - dropperLimitWidth) {
+        panelPixels[i] = dropperLimitColor;
+      } else {
+        panelPixels[i] = 0;
+      }
+    }
   } else {
-    deltaHue = -((-diff << 8) / (size - 1));
-  }
-  uint16_t accumulatedHue = leftHue << 8;
-  for (unsigned i = first, n = first + size; i < n; i++) {
-    RgbColor rgb = HsvToRgb(HsvColor(accumulatedHue >> 8, 255, 255));
-    uint32_t c = strip.Color(rgb.r, rgb.g, rgb.b);
-    panelPixels[i] = c;
-    accumulatedHue += deltaHue;
+    // Change left and right hue depending on the joysticks.
+    // Linearly interpolate between the 2 hues
+    uint8_t hueA = config.hueA;
+    uint8_t hueB = config.hueB;
+    uint8_t saturation = 255; // comms.HoverPositionUD;
+    uint8_t value = 255;
+
+    const auto margin = 5;
+    const auto maxHoverPosLR = 100;
+    auto pos = comms.HoverPositionLR;
+    if (pos >= maxHoverPosLR) {
+      pos = maxHoverPosLR - 1;
+    }
+    unsigned first = config.panelFirst[PANEL4];
+    unsigned size = ((uint16_t)pos * (config.panelSize[PANEL4] - 2 * margin)) / maxHoverPosLR + margin;
+
+    // Find the increment to be able to linearly interpolate between the 2 hues.
+    // The basic formula is delta = (rightHue - leftHue) / (size - 1)
+    // Take special care of negative numbers because these calculations
+    // are done using integer arithmetic.
+    uint16_t deltaHue;
+    int8_t diff = hueB - hueA;
+    if (diff >= 0) {
+      deltaHue = (diff << 8) / (size - 1);
+    } else {
+      deltaHue = -((-diff << 8) / (size - 1));
+    }
+    uint16_t accumulatedHue = hueA << 8;
+    for (unsigned i = first, n = first + size; i < n; i++) {
+      RgbColor rgb = HsvToRgb(HsvColor(accumulatedHue >> 8, saturation, value));
+      uint32_t c = strip.Color(rgb.r, rgb.g, rgb.b);
+      panelPixels[i] = c;
+      accumulatedHue += deltaHue;
+    }
+
+    first += size;
+    size = config.panelSize[PANEL4] - size;
+    diff = hueA - hueB;
+    if (diff >= 0) {
+      deltaHue = (diff << 8) / (size - 1);
+    } else {
+      deltaHue = -((-diff << 8) / (size - 1));
+    }
+    accumulatedHue = hueB << 8;
+    for (unsigned i = first, n = first + size; i < n; i++) {
+      RgbColor rgb = HsvToRgb(HsvColor(accumulatedHue >> 8, saturation, value));
+      uint32_t c = strip.Color(rgb.r, rgb.g, rgb.b);
+      panelPixels[i] = c;
+      accumulatedHue += deltaHue;
+    }
   }
 
   if (millis() - panelLastActive[PANEL4] > config.activeTimeout * 1000) {
@@ -573,6 +624,10 @@ int updateConfig(String arg) {
         config.bulletBaseDelay = value.toInt();
     } else if (name.equals("hueSliderDelay")) {
         config.hueSliderDelay = value.toInt();
+    } else if (name.equals("hueA")) {
+        config.hueA = value.toInt();
+    } else if (name.equals("hueB")) {
+        config.hueB = value.toInt();
     } else {
         return -2;
     }

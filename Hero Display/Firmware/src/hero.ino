@@ -74,7 +74,7 @@ const auto dataFile = "/home/pi/can_signals.json";
 #define JSON_SIGNAL_FLOAT(name) fprintf(file, "  \"%s\": %f,\n", #name, comms.name)
 
 uint32_t blueCount = 0;
-bool blueButtonPressedOld = false;
+bool greenButtonPressedOld = false;
 long exportLastTime = 0;
 void exportDataToJSON() {
   auto now = millis();
@@ -92,11 +92,12 @@ void exportDataToJSON() {
   JSON_SIGNAL_INT(BlueButtonPressed);
   JSON_SIGNAL_INT(RedButtonPressed);
   JSON_SIGNAL_INT(RedBallCount);
-  if (comms.BlueButtonPressed && !blueButtonPressedOld) {
+  // The counts are messed up so the green button increments the blue count
+  if (comms.GreenButtonPressed && !greenButtonPressedOld) {
     blueCount++;
   }
-  blueButtonPressedOld = comms.BlueButtonPressed;
-  comms.BlueBallCount = blueCount;
+  greenButtonPressedOld = comms.GreenButtonPressed;
+  comms.BlueBallCount += blueCount;
   JSON_SIGNAL_INT(BlueBallCount);
   JSON_SIGNAL_INT(GreenBallCount);
   JSON_SIGNAL_INT(Input2Active);
