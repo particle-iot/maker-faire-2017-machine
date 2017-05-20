@@ -8,9 +8,10 @@ unsigned long lastPrintTime = 0;
 
 #define CAN_PRINT_MESSAGE_ID 0x204
 
-//SYSTEM_MODE(MANUAL);
-CANChannel can(CAN_D1_D2);
+SYSTEM_MODE(MANUAL);
+CANChannel can(CAN_C4_C5);
 
+//unsigned long lastPrintTime = 0;
 
 
 void setup() {
@@ -19,11 +20,15 @@ void setup() {
     Particle.function("sendPrint", onTestPrint);
 
     can.begin(500000);
-
 }
 
 void loop() {
-    //unsigned long now = millis();
+    unsigned long now = millis();
+
+    if ((now - lastPrintTime) > 10000) {
+        onTestPrint("1");
+        lastPrintTime = millis();
+    }
 
     //checkCAN();
 
@@ -40,6 +45,9 @@ void loop() {
     }
 
     Serial.println("got can message, ID " + String(msg.id));
+
+
+
 }
 
 

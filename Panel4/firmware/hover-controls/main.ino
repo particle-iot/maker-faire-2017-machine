@@ -140,7 +140,8 @@ void setup() {
     bumperChecker.start();
 
     //start up the can bus
-    can.begin(500000);
+    //can.begin(500000);
+    comms.begin();
 
     PMIC power;
     power.disableCharging();
@@ -166,13 +167,16 @@ unsigned long lastCanUpdateTime = 0;
 #define CAN_UPDATE_FREQUENCY 250
 
 void transmitCANUpdates() {
+    comms.receive();
+
     unsigned long now = millis();
     if (( now - lastCanUpdateTime ) < CAN_UPDATE_FREQUENCY) {
         return;
     }
     lastCanUpdateTime = now;
+    Serial.println("sending hero update...");
 
-    comms.receive();
+
 
     if (comms.MachineStart) {
         isMachineStopped = false;
@@ -302,6 +306,7 @@ void hoverTick() {
     if (p.x==0 && p.y==0 && p.x==0) {
         // no input from user... stop the motor.
         controlMotor(MotorAction::STOP);
+        comms.Input4Active = false;
         return;
     }
 
@@ -338,6 +343,7 @@ void hoverTick() {
     if ((now - lastHoverCheck) < 250) {
         Serial.println(String::format("(%d, %d, %d) direction %s ", p.x, p.y, p.z, dir));
     }
+    comms.Input4Active = true;
     comms.HoverPositionLR = p.x;//getU8(m.data, 2);
     comms.HoverPositionUD = p.z;//getU8(m.data, 3);
 
@@ -489,11 +495,13 @@ void bumperCallback() {
 
 
 void sendPrintCommand(int index) {
+    Serial.print("sending print command");
     CANMessage message;
     message.id = CAN_PRINT_MESSAGE_ID;
     message.len = 1;
     setU8(message.data, index, 0);
     can.transmit(message);
+    Serial.println("...done");
 }
 
 
