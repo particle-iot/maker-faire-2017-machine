@@ -79,6 +79,50 @@ Config defaultConfig = {
 Storage<Config> storage(defaultConfig);
 
 /*
+ * Servo Setup
+ */
+
+ enum GatesState_e {
+  ALL_GATES_CLOSED,
+  TOP_GATE_OPEN,
+  MIDDLE_GATE_OPEN,
+  BOTTOM_GATE_OPEN
+} gatesState = ALL_GATES_CLOSED;
+
+Servo topServo;
+Servo middleServo;
+Servo bottomServo;
+
+uint8_t topServoPos = 0;
+uint8_t middleServoPos = 0;
+uint8_t bottomServoPos = 0;
+bool autoServo = true;
+
+
+/*
+ * Yayyyy
+ */
+
+enum SensorColor_e {
+  OTHER_COLOR,
+  ORANGE_COLOR,
+  CYAN_COLOR,
+  MAGENTA_COLOR
+};
+SensorColor_e sensorColor = OTHER_COLOR;
+SensorColor_e colorMatch = OTHER_COLOR;
+
+enum PanelState_e {
+  WAIT_FOR_COLOR,
+  COLOR_MATCHED,
+} panelState = WAIT_FOR_COLOR;
+
+uint32_t panelTime = 0;
+bool panelActive = false;
+
+
+
+/*
  * SETUP
  */
 
@@ -103,7 +147,11 @@ void loop() {
   updateDetectors();
   updateColorSensor();
   doPanelControl();
-  controlBallPump();
+  //controlBallPump();
+
+  ballReleaseMagic();
+  ballReleaseTick();
+
   controlServos();
   printStatus();
   transmitComms();
@@ -201,53 +249,92 @@ void setupBallPump() {
   digitalWrite(BALL_PUMP_PIN, BALL_PUMP_STOP);
 }
 
-void controlBallPump() {
-  // Run the ball pump when there's no ball in front of the detector for a while
-  auto now = millis();
-  if (beamBrokenInput) {
-    lastInputDetectionTime = now;
-  } else {
-    lastInputGapTime = now;
-  }
+//void controlBallPump() {
+//  // Run the ball pump when there's no ball in front of the detector for a while
+//  auto now = millis();
+//  if (beamBrokenInput) {
+//    lastInputDetectionTime = now;
+//  }
+//  else {
+//    lastInputGapTime = now;
+//  }
+//
+//  switch (ballPumpState) {
+//    case BALL_PUMP_IDLE:
+//      if (now - lastInputDetectionTime > config.ballPumpStartDelay) {
+//        ballPumpState = BALL_PUMP_RUNNING;
+//        ballPumpStartTime = now;
+//        runBallPump = true;
+//      }
+//      break;
+//    case BALL_PUMP_RUNNING:
+//      if (beamBrokenInput && now - lastInputGapTime > config.ballPumpStopDelay) {
+//        ballPumpState = BALL_PUMP_IDLE;
+//        runBallPump = false;
+//      }
+//      break;
+//  }
+//
+//  digitalWrite(BALL_PUMP_PIN, runMachine && runBallPump ? BALL_PUMP_RUN : BALL_PUMP_STOP);
+//}
 
-  switch (ballPumpState) {
-    case BALL_PUMP_IDLE:
-      if (now - lastInputDetectionTime > config.ballPumpStartDelay) {
-        ballPumpState = BALL_PUMP_RUNNING;
-        ballPumpStartTime = now;
-        runBallPump = true;
-      }
-      break;
-    case BALL_PUMP_RUNNING:
-      if (beamBrokenInput && now - lastInputGapTime > config.ballPumpStopDelay) {
-        ballPumpState = BALL_PUMP_IDLE;
-        runBallPump = false;
-      }
-      break;
-  }
+void triggerBallRelease() {
+    if (!runMachine) {
+        return;
+    }
 
-  digitalWrite(BALL_PUMP_PIN, runMachine && runBallPump ? BALL_PUMP_RUN : BALL_PUMP_STOP);
+    unsigned long now = millis();
+    ballPumpStartTime = now;
+    digitalWrite(BALL_PUMP_PIN, BALL_PUMP_RUN);
+}
+
+void ballReleaseTick() {
+    if (ballPumpStartTime <= 0) {
+        return;
+    }
+
+    unsigned long now = millis();
+    int ballReleaseDuration = 600;
+
+    if ((now - ballPumpStartTime) > ballReleaseDuration) {
+        // stop ball release
+        ballPumpStartTime = 0;
+        digitalWrite(BALL_PUMP_PIN, BALL_PUMP_STOP);
+    }
+}
+
+GatesState_e lastState = ALL_GATES_CLOSED;
+void ballReleaseMagic() {
+    if (!panelActive) {
+        // nobody is using the panel?
+        return;
+    }
+
+    if (beamBrokenInput) {
+        // we're full of balls?
+        return;
+    }
+
+    if (lastState == gatesState) {
+        // nothing changed
+        return;
+    }
+
+    //if (((lastState == MIDDLE_GATE_OPEN) || (lastState == TOP_GATE_OPEN))
+    if ((lastState != BOTTOM_GATE_OPEN) && (gatesState == BOTTOM_GATE_OPEN))
+        {
+            lastState = ALL_GATES_CLOSED;
+            triggerBallRelease();
+        }
+        else {
+            lastState = gatesState;
+        }
 }
 
 /*
  * Servo gates
  */
 
-enum GatesState_e {
-  ALL_GATES_CLOSED,
-  TOP_GATE_OPEN,
-  MIDDLE_GATE_OPEN,
-  BOTTOM_GATE_OPEN
-} gatesState = ALL_GATES_CLOSED;
-
-Servo topServo;
-Servo middleServo;
-Servo bottomServo;
-
-uint8_t topServoPos = 0;
-uint8_t middleServoPos = 0;
-uint8_t bottomServoPos = 0;
-bool autoServo = true;
 
 void setupServos() {
   topServoPos = config.topServoClosedPos;
@@ -301,22 +388,6 @@ void controlServos() {
  * Main panel control
  */
 
-enum SensorColor_e {
-  OTHER_COLOR,
-  ORANGE_COLOR,
-  CYAN_COLOR,
-  MAGENTA_COLOR
-};
-SensorColor_e sensorColor = OTHER_COLOR;
-SensorColor_e colorMatch = OTHER_COLOR;
-
-enum PanelState_e {
-  WAIT_FOR_COLOR,
-  COLOR_MATCHED,
-} panelState = WAIT_FOR_COLOR;
-
-uint32_t panelTime = 0;
-bool panelActive = false;
 
 void doPanelControl() {
   auto now = millis();
