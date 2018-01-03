@@ -18,7 +18,7 @@ Open points / suggestions:
 
 ## Software Library
 
-https://github.com/spark/library-beam-detector
+https://github.com/particle-iot/library-beam-detector
 
 ## Assembly
 

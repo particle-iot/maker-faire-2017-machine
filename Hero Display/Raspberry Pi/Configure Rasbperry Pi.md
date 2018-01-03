@@ -135,7 +135,7 @@ Generate an ssh key on the Pi
 ssh-keygen
 ```
 
-Add the `~/.ssh/id_rsa.pub` to the [Maker Faire Machine repo](https://github.com/spark/maker-faire-2017-machine/settings/keys) with read/write permissions.
+Add the `~/.ssh/id_rsa.pub` to the [Maker Faire Machine repo](https://github.com/particle-iot/maker-faire-2017-machine/settings/keys) with read/write permissions.
 
 Clone the repo to the Pi
 ```
