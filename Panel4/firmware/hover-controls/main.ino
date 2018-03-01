@@ -81,7 +81,7 @@ Communication comms = Communication(can);
 
 
 // laser gate stuff
-#define PRINT_DELAY 1000
+#define PRINT_DELAY 60000
 int counters[4] = {0,0,0,0};
 unsigned long lastPrintTime = 0;
 
@@ -492,6 +492,30 @@ void bumperCallback() {
         digitalWrite(D7,LOW);
     }
 }
+
+
+////
+//// only print once a minute
+//
+//unsigned long lastPrintTime = 0;
+//unsigned long printDelay = 60000;
+//
+//void sendPrintCommand(int index) {
+//    unsigned long now = millis();
+//    if ((now - lastPrintTime) < printDelay) {
+//        return;
+//    }
+//    lastPrintTime = now;
+//
+//    Serial.print("sending print command");
+//    CANMessage message;
+//    message.id = CAN_PRINT_MESSAGE_ID;
+//    message.len = 1;
+//    setU8(message.data, index, 0);
+//    can.transmit(message);
+//    Serial.println("...done");
+//}
+
 
 
 void sendPrintCommand(int index) {
